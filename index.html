@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111b1b">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <title>Pocket Field · Training Ground</title>
+</head>
+<body>
+  <main class="app">
+    <header class="masthead">
+      <a class="brand" href="./" aria-label="Pocket Field home"><span class="brand-mark">PF</span> POCKET FIELD<span class="edition">FOOTBALL CLUB / EST. 2026</span></a>
+      <span class="build"><i></i> OFFENSE BUILD <b>02</b></span>
+    </header>
+    <section class="heading"><div><p class="eyebrow">THE FIELD IS YOURS</p><h1>Run the offense<span>.</span></h1><p class="intro">Read the coverage. Lead your receiver. Take it to the house.</p></div><div class="session"><span class="status-dot"></span><div>OFFENSIVE PRACTICE<small>SNAP. THROW. GO.</small></div></div></section>
+    <section class="game-shell" aria-label="Football practice game">
+      <div class="scoreboard"><div class="team"><span class="team-icon">N</span><div>NORTHSIDE<small>OFFENSE →</small></div></div><div class="mode"><span>PASS / RUN</span><small>OWN 35 · SINGLE PLAY</small></div><button id="pause" type="button">Ⅱ <span>PAUSE</span><kbd>ESC</kbd></button></div>
+      <div class="viewport" id="viewport">
+        <canvas id="game" tabindex="0" aria-label="Football field. Space to snap. Aim with mouse and click to pass. Move with WASD or arrows, Shift to sprint, J to juke, H to hand off, Escape to pause, R for a new play."></canvas>
+        <div class="field-label"><span class="live-dot"></span><span id="state-label">LIVE PRACTICE</span></div>
+        <div class="camera-label" id="juke-label">JUKE READY</div>
+        <div id="play-result" class="play-result" role="status" hidden></div>
+        <div class="overlay" id="overlay" hidden><div class="pause-card"><p class="eyebrow">TAKE A BREATHER</p><h2>Practice paused.</h2><p>Your spot on the field is waiting.</p><button id="resume" type="button">BACK TO THE FIELD <span>→</span></button><small>OR PRESS ESC / P</small></div></div>
+        <div class="field-bottom"><span><i></i> <span id="player-label">01 / QUARTERBACK</span></span><span id="position-label">OWN 25 YD</span></div>
+      </div>
+      <div class="play-status"><span id="play-notice">SPACE TO SNAP · Attack the right end zone →</span><button id="snap" type="button">SNAP BALL →</button></div>
+      <div class="controls"><div><kbd>SPACE</kbd><span>Snap</span></div><div><kbd>MOUSE</kbd><span>Aim + click pass</span></div><div><kbd>WASD / ↑↓←→</kbd><span>Move</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>J</kbd><span>Juke</span></div><div><kbd>H</kbd><span>Handoff</span></div><div><kbd>R</kbd><span>New play</span></div></div>
+    </section>
+    <footer><span><b>02</b> THE OFFENSE<span class="footer-divider">/</span> Point at a receiver for a led pass. Open grass for manual aim.</span><span>KEYBOARD + MOUSE <span class="status-dot"></span></span></footer>
+  </main>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
