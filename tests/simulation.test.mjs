@@ -89,16 +89,16 @@ test('reset during flight clears ball state and out-of-bounds passes cannot be c
 
 test('QB accuracy changes dispersion and difficult catches depend on catching rating', () => {
   const errors = [];
-  for (const accuracy of [0, 1]) {
-    const p = makePlay(); p.snap(); p.qb.accuracy = accuracy;
+  for (const accuracy of [1, 99]) {
+    const p = makePlay(); p.snap(); p.qb.setRatings({ accuracy });
     const point = { x: 1600, y: 120 }; const target = p.aim(point).target;
     p.throw(point); errors.push(distance(target, p.ball.target));
   }
-  assert.ok(errors[0] > 40); assert.equal(errors[1], 0);
+  assert.ok(errors[0] > 40); assert.ok(errors[1] < errors[0] / 20);
   const p = makePlay(); const receiver = p.receivers[0]; p.passDistance = 900;
   p.defenders[0].x = receiver.x; p.defenders[0].y = receiver.y;
-  receiver.catching = .2; const low = p.catchChance(receiver, 35);
-  receiver.catching = .95; assert.ok(p.catchChance(receiver, 35) > low + .4);
+  receiver.setRatings({ catching: 20 }); const low = p.catchMargin(receiver, 35);
+  receiver.setRatings({ catching: 95 }); assert.ok(p.catchMargin(receiver, 35) > low + .4);
 });
 
 test('defender intercepts a bad pass and a missed pass ends incomplete', () => {
@@ -112,9 +112,10 @@ test('defender intercepts a bad pass and a missed pass ends incomplete', () => {
 
 test('drop does not get retried each frame and ineligible linemen cannot catch', () => {
   const p = makePlay(() => .9999); p.snap();
-  const receiver = p.receivers[0]; p.ball.x = receiver.x; p.ball.y = receiver.y;
+  const receiver = p.receivers[0]; receiver.setRatings({ catching: 1, awareness: 1 });
+  p.ball.x = receiver.x + 44; p.ball.y = receiver.y;
   assert.equal(p.resolveCatch(), false); assert.equal(p.ball.attempted.has(receiver), true);
-  p.random = () => 0; assert.equal(p.resolveCatch(), false);
+  receiver.setRatings({ catching: 99, awareness: 99 }); assert.equal(p.resolveCatch(), false);
   p.ball.x = p.linemen[2].x; p.ball.y = p.linemen[2].y;
   assert.equal(p.resolveCatch(), false);
 });

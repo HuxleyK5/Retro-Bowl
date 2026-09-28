@@ -1,16 +1,29 @@
 import { MatchRules } from './MatchRules.js';
 import { Opponent } from './Opponent.js';
+import { DEFAULT_PLAY, PLAYBOOK, getPlay } from '../football/Playbook.js';
 
 export class MatchController {
   constructor(play, random = Math.random) {
     this.play = play; this.rules = new MatchRules(random); this.opponent = new Opponent(random);
     this.phaseAge = 0; this.lastPhase = this.rules.phase;
+    this.selectedPlayId = DEFAULT_PLAY;
   }
   get humanTurn() { return this.rules.possession === 'home'; }
-  start(seconds) { this.rules.start(seconds); this.prepare(); }
+  start(seconds) { this.rules.start(seconds); this.selectedPlayId = DEFAULT_PLAY; this.prepare(); }
   prepare() {
-    this.play.configure(this.rules.spot, this.rules.possession, this.rules.firstDownLine);
+    const id = this.humanTurn ? this.selectedPlayId : this.opponent.selectPlay(this.rules);
+    this.play.configure(this.rules.spot, this.rules.possession, this.rules.firstDownLine, id);
     this.opponent.reset(); this.phaseAge = 0;
+  }
+  selectPlay(id) {
+    if (this.rules.phase !== 'ready' || !this.humanTurn || !getPlay(id)) return false;
+    this.selectedPlayId = id;
+    this.play.configure(this.rules.spot, this.rules.possession, this.rules.firstDownLine, id);
+    return true;
+  }
+  audible(direction) {
+    const index = PLAYBOOK.findIndex(call => call.id === this.selectedPlayId);
+    return this.selectPlay(PLAYBOOK[(index + direction + PLAYBOOK.length) % PLAYBOOK.length].id);
   }
   advance() {
     const r = this.rules;
@@ -29,11 +42,12 @@ export class MatchController {
     const extra = kind === 'extraPoint';
     if (extra) p.configure(85, this.rules.possession, 100);
     p.phase = 'dead'; p.carrier = null;
-    const target = kind === 'punt' ? { x: Math.min(p.field.width - 50, p.lineOfScrimmage + 850), y: p.field.height / 2 } : { x: p.field.width - 20, y: p.field.height / 2 };
+    const target = kind === 'punt' ? { x: Math.min(p.field.width - 20, p.field.endZone + this.rules.kick.landing * p.field.yard), y: p.field.height / 2 } : { x: p.field.width - 20, y: p.field.height / 2 + (this.rules.kick.good ? 0 : 140) };
     p.ball.throw(p.qb, target, 3);
     this.phaseAge = 0; return true;
   }
   action(action, movement, point) {
+    if (action === 'audiblePrevious' || action === 'audibleNext') { this.audible(action === 'audibleNext' ? 1 : -1); return; }
     if (action === 'snap' || action === 'reset') { if (action === 'snap' || this.rules.phase !== 'live') this.advance(); return; }
     if (!this.humanTurn) return;
     if (action === 'fieldGoal') this.kick('fieldGoal');

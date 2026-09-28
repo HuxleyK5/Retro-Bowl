@@ -14,11 +14,18 @@ export class PlayRenderer {
     if (play.phase === 'presnap') {
       c.setLineDash([12, 12]); c.lineWidth = 3; c.strokeStyle = '#edf4b68c';
       for (const receiver of play.receivers) {
+        c.strokeStyle = receiver === play.rb ? '#f6ca70cc' : play.call?.type === 'run' ? '#a7b89a77' : '#edf4b68c';
         c.beginPath(); c.moveTo(receiver.x, receiver.y);
         receiver.route.forEach(p => c.lineTo(p.x, p.y)); c.stroke();
         const end = receiver.route.at(-1);
-        c.setLineDash([]); c.beginPath(); c.moveTo(end.x - 14, end.y - 9); c.lineTo(end.x, end.y); c.lineTo(end.x - 14, end.y + 9); c.stroke(); c.setLineDash([12, 12]);
+        const prev = receiver.route.length > 1 ? receiver.route.at(-2) : receiver;
+        c.save(); c.setLineDash([]); c.translate(end.x, end.y); c.rotate(Math.atan2(end.y - prev.y, end.x - prev.x));
+        c.beginPath(); c.moveTo(-14, -9); c.lineTo(0, 0); c.lineTo(-14, 9); c.stroke(); c.restore();
       }
+    }
+    if (play.call?.type === 'run' && play.live && play.execution.guided) {
+      c.strokeStyle = '#f6ca7088'; c.lineWidth = 3; c.setLineDash([10, 12]); c.beginPath(); c.moveTo(play.rb.x, play.rb.y);
+      play.rb.route.slice(play.rb.routeIndex).forEach(p => c.lineTo(p.x, p.y)); c.stroke(); c.setLineDash([]);
     }
     if (play.canThrow && aim) {
       const { target, receiver } = aim;

@@ -6,30 +6,67 @@
   <meta name="theme-color" content="#111b1b">
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
-  <title>Pocket Field · Training Ground</title>
+  <title>Pocket Field · Match Day</title>
 </head>
 <body>
   <main class="app">
     <header class="masthead">
       <a class="brand" href="./" aria-label="Pocket Field home"><span class="brand-mark">PF</span> POCKET FIELD<span class="edition">FOOTBALL CLUB / EST. 2026</span></a>
-      <span class="build"><i></i> OFFENSE BUILD <b>02</b></span>
+      <span class="build"><i></i> FICTIONAL LEAGUE <b>06</b></span>
     </header>
-    <section class="heading"><div><p class="eyebrow">THE FIELD IS YOURS</p><h1>Run the offense<span>.</span></h1><p class="intro">Read the coverage. Lead your receiver. Take it to the house.</p></div><div class="session"><span class="status-dot"></span><div>OFFENSIVE PRACTICE<small>SNAP. THROW. GO.</small></div></div></section>
-    <section class="game-shell" aria-label="Football practice game">
-      <div class="scoreboard"><div class="team"><span class="team-icon">N</span><div>NORTHSIDE<small>OFFENSE →</small></div></div><div class="mode"><span>PASS / RUN</span><small>OWN 35 · SINGLE PLAY</small></div><button id="pause" type="button">Ⅱ <span>PAUSE</span><kbd>ESC</kbd></button></div>
+    <section class="heading"><div><p class="eyebrow">SATURDAY UNDER THE LIGHTS</p><h1>Make every down count<span>.</span></h1><p class="intro">A new league. A club of your own.</p></div><div class="session"><span class="status-dot"></span><div>CONTINENTAL GRIDIRON<small>24 CLUBS / 1,272 PLAYERS</small></div></div></section>
+    <section id="league-screen" class="league-screen" aria-labelledby="league-name">
+      <p class="eyebrow">24 CLUBS / YOUR NEXT CHAPTER</p><h2 id="league-name"></h2>
+      <p>Choose your club. Every roster is fictional; every rating matters on the field.</p>
+      <div id="team-grid" class="team-grid" aria-label="Choose a franchise team"></div>
+      <div class="club-detail"><h3 id="selected-club"></h3><p id="club-details"></p><p id="club-summary"></p>
+        <button id="start-franchise" type="button">START FRANCHISE</button> <button id="continue-franchise" type="button" hidden>CONTINUE SAVED CLUB</button>
+        <p id="save-status" role="status">Saves your club and league rosters in this browser. Starting a new franchise replaces that snapshot. Game progress is not saved yet.</p>
+        <details><summary>EXPLORE ALL 53 PLAYERS</summary><div class="roster-scroll"><table class="club-table"><thead><tr><th>PLAYER</th><th>POS</th><th>AGE</th><th>OVR</th><th>POT</th><th>CONTRACT / YEAR</th><th>GUARANTEED</th></tr></thead><tbody id="club-roster"></tbody></table></div></details>
+      </div>
+    </section>
+    <section hidden class="game-shell" aria-label="Football game">
+      <div class="scoreboard match-scoreboard">
+        <div class="score-team" id="home-team"><span class="team-icon">N</span><div><span id="home-name">HOME</span><small>HOME / YOU</small></div><strong id="home-score">0</strong></div>
+        <div class="score-time"><span id="quarter">Q1</span><strong id="game-clock">2:00</strong><small>PLAY <b id="play-clock">40</b></small></div>
+        <div class="score-team visitor" id="away-team"><strong id="away-score">0</strong><div><span id="away-name">AWAY</span><small>AWAY / CPU</small></div><span class="team-icon">E</span></div>
+        <button id="pause" type="button">Ⅱ <span>PAUSE</span><kbd>ESC</kbd></button>
+      </div>
+      <div class="drive-bar"><span id="possession">NORTHSIDE BALL →</span><strong id="down-distance">1ST & 10</strong><span id="ball-spot">OWN 25</span><span class="line-legend">BLUE: SCRIMMAGE <i></i> GOLD: FIRST DOWN</span></div>
+      <div class="play-stage" id="play-stage">
+      <aside class="playbook" id="playbook" aria-label="Offensive play selection" hidden>
+        <div class="playbook-heading"><span>CALL YOUR PLAY</span><span>Q / E AUDIBLE</span></div>
+        <h2 id="call-name">Slants</h2><p id="call-formation">Shotgun spread</p>
+        <canvas id="call-preview" width="440" height="160" role="img" aria-label="Selected formation and routes"></canvas>
+        <p id="call-description"></p>
+        <h3>PASSING</h3><div class="play-grid" id="pass-plays"></div>
+        <h3>RUNNING</h3><div class="play-grid" id="run-plays"></div>
+        <button id="playbook-snap" type="button">SPACE · SNAP BALL →</button>
+      </aside>
       <div class="viewport" id="viewport">
-        <canvas id="game" tabindex="0" aria-label="Football field. Space to snap. Aim with mouse and click to pass. Move with WASD or arrows, Shift to sprint, J to juke, H to hand off, Escape to pause, R for a new play."></canvas>
+        <canvas id="game" tabindex="0" aria-label="Football field. Space to snap or continue. Aim with mouse and click to pass. WASD or arrows to move, Shift to sprint, J to juke, H to hand off, F for field goal, K to punt, Escape to pause."></canvas>
         <div class="field-label"><span class="live-dot"></span><span id="state-label">LIVE PRACTICE</span></div>
         <div class="camera-label" id="juke-label">JUKE READY</div>
         <div id="play-result" class="play-result" role="status" hidden></div>
-        <div class="overlay" id="overlay" hidden><div class="pause-card"><p class="eyebrow">TAKE A BREATHER</p><h2>Practice paused.</h2><p>Your spot on the field is waiting.</p><button id="resume" type="button">BACK TO THE FIELD <span>→</span></button><small>OR PRESS ESC / P</small></div></div>
+        <div class="match-screen" id="match-screen"><div class="match-card"><p class="eyebrow" id="screen-eyebrow">NORTHSIDE vs EASTBANK</p><h2 id="screen-title">Four quarters. Your game.</h2><p id="screen-copy">You run Northside’s offense. Eastbank plays automatically.</p><div id="match-options"><label for="quarter-length">QUARTER LENGTH</label><select id="quarter-length"><option value="60">1 minute · Quick game</option><option value="120" selected>2 minutes · Arcade</option><option value="300">5 minutes</option><option value="900">15 minutes · Regulation</option></select><small>Kickoffs are touchbacks. Offense always attacks right.<br>Four-quarter regulation game; ties stand.</small></div><div id="screen-summary" hidden></div><button id="screen-action" type="button">START GAME →</button></div></div>
+        <div class="overlay" id="overlay" hidden><div class="pause-card"><p class="eyebrow">TAKE A BREATHER</p><h2>Game paused.</h2><p>Both clocks and the play are frozen.</p><button id="resume" type="button">BACK TO THE FIELD <span>→</span></button><small>OR PRESS ESC / P</small></div></div>
         <div class="field-bottom"><span><i></i> <span id="player-label">01 / QUARTERBACK</span></span><span id="position-label">OWN 25 YD</span></div>
       </div>
-      <div class="play-status"><span id="play-notice">SPACE TO SNAP · Attack the right end zone →</span><button id="snap" type="button">SNAP BALL →</button></div>
-      <div class="controls"><div><kbd>SPACE</kbd><span>Snap</span></div><div><kbd>MOUSE</kbd><span>Aim + click pass</span></div><div><kbd>WASD / ↑↓←→</kbd><span>Move</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>J</kbd><span>Juke</span></div><div><kbd>H</kbd><span>Handoff</span></div><div><kbd>R</kbd><span>New play</span></div></div>
+      </div>
+      <div class="play-status"><span id="play-notice">Choose your quarter length to begin.</span><div class="play-actions"><button id="field-goal" type="button" hidden>F · FIELD GOAL</button><button id="punt" type="button" hidden>K · PUNT</button><button id="snap" type="button" hidden>SNAP BALL →</button></div></div>
+      <div class="controls"><button id="change-club" type="button">LEAGUE / NEW FRANCHISE</button><button id="ratings-toggle" type="button">ROSTER / RATINGS</button><div><kbd>SPACE</kbd><span>Snap / continue</span></div><div><kbd>Q / E</kbd><span>Audible</span></div><div><kbd>MOUSE</kbd><span>Aim + click pass</span></div><div><kbd>WASD / ↑↓←→</kbd><span>Move</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>J</kbd><span>Juke</span></div><div><kbd>H</kbd><span>Handoff</span></div><div><kbd>F / K</kbd><span>FG / punt</span></div></div>
     </section>
-    <footer><span><b>02</b> THE OFFENSE<span class="footer-divider">/</span> Point at a receiver for a led pass. Open grass for manual aim.</span><span>KEYBOARD + MOUSE <span class="status-dot"></span></span></footer>
+    <footer><span><b>06</b> FICTIONAL LEAGUE<span class="footer-divider">/</span> Pick your call. Read the coverage. Make your move.</span><span>KEYBOARD + MOUSE <span class="status-dot"></span></span></footer>
   </main>
+  <section class="ratings-panel" id="ratings-panel" role="dialog" aria-modal="true" aria-labelledby="ratings-title" hidden>
+    <div class="ratings-card">
+      <div class="ratings-heading"><div><p class="eyebrow">THE PEOPLE BEHIND THE PLAYS</p><h2 id="ratings-title">Player ratings.</h2></div><button id="ratings-close" type="button">CLOSE · ESC</button></div>
+      <p class="ratings-note">Ratings use a 1–99 scale. The game and both clocks are paused.</p>
+      <div class="ratings-selectors"><label>TEAM<select id="ratings-team"><option value="home">Northside</option><option value="away">Eastbank</option></select></label><label>PLAYER<select id="ratings-player"></select></label></div>
+      <h3 id="ratings-name"></h3><p id="ratings-position"></p>
+      <div id="ratings-values"></div><p id="ratings-effect"></p><small id="ratings-identity"></small>
+    </div>
+  </section>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

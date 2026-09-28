@@ -7,6 +7,7 @@ export class Renderer {
     if (!this.ctx) throw new Error('A browser with Canvas 2D support is required.');
   }
   resize(width, height) {
+    width = Math.max(1, width); height = Math.max(1, height);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(width * this.dpr); this.canvas.height = Math.round(height * this.dpr);
     this.camera.resize(width, height);
@@ -48,9 +49,9 @@ export class Renderer {
       c.save(); c.translate(x, 135); c.rotate(Math.PI); c.fillText(String(Math.min(i, 100 - i)), 0, 0); c.restore();
     }
     for (const x of [end / 2, w - end / 2]) {
-      c.save(); c.translate(x, h / 2); c.rotate(-Math.PI / 2); c.font = 'bold 64px monospace'; c.fillStyle = '#a9c49355'; c.fillText('NORTHSIDE', 0, 0); c.restore();
+      c.save(); c.translate(x, h / 2); c.rotate(-Math.PI / 2); c.font = 'bold 64px monospace'; c.fillStyle = '#a9c49355'; c.fillText(this.teams?.home.name.toUpperCase() || 'POCKET FIELD', 0, 0, h - 100); c.restore();
     }
-    c.save(); c.translate(w / 2, h / 2); c.rotate(-Math.PI / 8); c.fillStyle = '#b5ce8d24'; c.fillRect(-90, -90, 180, 180); c.rotate(Math.PI / 8); c.font = 'bold 88px monospace'; c.fillStyle = '#c1d69a44'; c.fillText('N', 0, 5); c.restore();
+    c.save(); c.translate(w / 2, h / 2); c.rotate(-Math.PI / 8); c.fillStyle = '#b5ce8d24'; c.fillRect(-90, -90, 180, 180); c.rotate(Math.PI / 8); c.font = 'bold 88px monospace'; c.fillStyle = '#c1d69a44'; c.fillText(this.teams?.home.abbreviation || 'PF', 0, 5); c.restore();
     c.fillStyle = '#bdcc92';
     for (const x of [0, end, w - end, w]) for (const y of [-4, h - 4]) { c.fillStyle = '#efae63'; c.fillRect(x - 4, y, 8, 8); }
     c.fillStyle = '#b4c19b66';
@@ -65,9 +66,10 @@ export class Renderer {
     c.fillStyle = '#eee7ba'; c.fillRect(-10, 8 + stride, 7, 4); c.fillRect(3, 8 - stride, 7, 4);
     c.fillStyle = '#ad7850'; c.fillRect(-17, -7 - stride / 2, 6, 12); c.fillRect(11, -7 + stride / 2, 6, 12);
     const uniform = p.uniform || p.team;
-    c.fillStyle = uniform === 'home' ? '#e3ecbb' : '#d58c62'; c.fillRect(-13, -12, 26, 19);
-    c.fillStyle = uniform === 'home' ? '#607c50' : '#814e3e'; c.fillRect(-13, -11, 4, 7); c.fillRect(9, -11, 4, 7);
-    c.font = 'bold 10px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#283d2e'; c.fillText(p.number, 0, 0);
+    const club = this.teams?.[uniform];
+    c.fillStyle = club?.primaryColor || (uniform === 'home' ? '#e3ecbb' : '#d58c62'); c.fillRect(-13, -12, 26, 19);
+    c.fillStyle = club?.secondaryColor || '#e3ecbb'; c.fillRect(-13, -11, 4, 7); c.fillRect(9, -11, 4, 7);
+    c.font = 'bold 10px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = club ? '#ffffff' : '#283d2e'; c.fillText(p.number, 0, 0);
     c.fillStyle = '#172f29'; c.fillRect(-10, -26, 20, 15); c.fillStyle = '#dfe9b8'; c.fillRect(-9, -25, 18, 12); c.fillStyle = '#6c8755'; c.fillRect(-2, -25, 4, 12); c.fillStyle = '#263f32'; c.fillRect(p.facing > 0 ? 5 : -10, -17, 6, 5);
     if (p.jukeTime > 0) { c.strokeStyle = '#edff9e'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 34, -.7, 1.5); c.stroke(); }
     c.restore();
