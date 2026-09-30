@@ -9,3 +9,5 @@
 
 /* Canvas backing dimensions must not determine the grid row's intrinsic size. */
 .viewport > #game { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.kick-meter{position:absolute;z-index:3;bottom:65px;left:50%;transform:translateX(-50%);width:min(420px,92%);padding:16px;background:#10271ff5;border:2px solid #d8e8a1;text-align:center}.kick-meter strong{font: bold 15px monospace;color:#e5eeac}.kick-meter p{font-size:12px;line-height:1.5}.kick-meter small{display:block;font-size:10px;line-height:1.5;margin-top:10px;color:#b9c9a5}#kick-track{position:relative;height:24px;margin:16px 5px;background:linear-gradient(to right,#714531,#adc755);border:1px solid #a6b583}#kick-track.accuracy{background:linear-gradient(to right,#714531 0%,#714531 35%,#88ab5b 43%,#d8ee93 50%,#88ab5b 57%,#714531 65%)}#kick-track.accuracy:after{content:'';position:absolute;left:50%;top:0;height:100%;width:2px;background:white}#kick-needle{position:absolute;z-index:1;top:-5px;bottom:-5px;width:4px;transform:translateX(-50%);background:#fff;box-shadow:0 0 3px #000}#kick-lock{background:#d8ee93;color:#203125;font-weight:bold}

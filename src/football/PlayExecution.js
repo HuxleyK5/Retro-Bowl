@@ -54,7 +54,7 @@ export class PlayExecution {
       p.notice = 'PLAY ACTION · Faking the handoff…';
       return steer(p.qb, this.point([-5, 0]));
     }
-    if (call.fakeDuration && p.phase === 'passing') p.notice = 'PLAY ACTION · Fake complete. Aim + click to pass';
+    if (call.fakeDuration && p.phase === 'passing') p.notice = 'PLAY ACTION · Fake complete. Pull back + release to pass';
     if (call.type === 'run' && p.carrier === p.rb && this.guided) {
       if (input.x || input.y) this.guided = false;
       else return steer(p.rb, p.routes.target(p.rb), !!input.sprint);

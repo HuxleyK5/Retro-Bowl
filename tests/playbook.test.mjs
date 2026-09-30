@@ -90,7 +90,7 @@ test('user steering overrides the designed run lane permanently, sprint and juke
 });
 
 test('audibles reconfigure formations but cannot reset downs, clocks, score or field position', () => {
-  const m = new MatchController(new Play(new Field())); m.start(60); m.rules.tick(7);
+  const m = new MatchController(new Play(new Field())); m.start(60, false); m.rules.tick(7);
   const before = JSON.stringify(m.rules);
   for (const call of PLAYBOOK) { assert.equal(m.selectPlay(call.id), true); assert.equal(m.play.call, call); assert.equal(JSON.stringify(m.rules), before); }
   assert.equal(m.audible(1), true); assert.equal(m.selectedPlayId, PLAYBOOK[0].id);
@@ -100,7 +100,7 @@ test('audibles reconfigure formations but cannot reset downs, clocks, score or f
 });
 
 test('each new human down retains the call, CPU uses playbook and cannot be audibled by human', () => {
-  const m = new MatchController(new Play(new Field()), () => .4); m.start(60); m.selectPlay('curls');
+  const m = new MatchController(new Play(new Field()), () => .4); m.start(60, false); m.selectPlay('curls');
   m.snap(); m.rules.completePlay({type:'INCOMPLETE',spot:25}); m.advance(); assert.equal(m.play.call.id, 'curls');
   m.rules.changePossession(25); m.prepare(); assert.ok(getPlay(m.play.call.id)); assert.equal(m.selectPlay('sweep'), false);
   for (const call of PLAYBOOK) {

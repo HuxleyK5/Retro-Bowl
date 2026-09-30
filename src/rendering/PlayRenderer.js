@@ -1,10 +1,12 @@
 export class PlayRenderer {
   drawGuides(c, play, aim) {
     c.save();
+    if (!play.isKickoff) {
     c.strokeStyle = '#a6ddedaa'; c.lineWidth = 3;
     c.beginPath(); c.moveTo(play.lineOfScrimmage, 0); c.lineTo(play.lineOfScrimmage, play.field.height); c.stroke();
     if (play.firstDownX) {
       c.strokeStyle = '#f3ce6cbb'; c.beginPath(); c.moveTo(play.firstDownX, 0); c.lineTo(play.firstDownX, play.field.height); c.stroke();
+    }
     }
     c.strokeStyle = '#f4d37d'; c.lineWidth = 5;
     for (const x of [5, play.field.width - 5]) {
@@ -30,7 +32,15 @@ export class PlayRenderer {
     if (play.canThrow && aim) {
       const { target, receiver } = aim;
       c.strokeStyle = receiver ? '#edff9e' : '#fff3ca'; c.lineWidth = 2; c.setLineDash([9, 10]);
-      c.beginPath(); c.moveTo(play.qb.x, play.qb.y); c.lineTo(target.x, target.y); c.stroke();
+      c.setLineDash([]); c.fillStyle = '#fff3ca';
+      const dots = Math.max(12, Math.ceil(Math.hypot(target.x-play.qb.x, target.y-play.qb.y)/22));
+      for (let i = 0; i <= dots; i++) {
+        const t = i / dots;
+        const height = 4 * 105 * t * (1-t) + 10 * (1-t);
+        c.beginPath(); c.arc(play.qb.x+(target.x-play.qb.x)*t, play.qb.y+(target.y-play.qb.y)*t-height, 3.5, 0, Math.PI*2); c.fill();
+      }
+      c.font = 'bold 15px monospace'; c.textAlign = 'center';
+      c.fillText('RELEASE TO THROW', play.qb.x, play.qb.y-55);
       c.setLineDash([]); c.beginPath(); c.ellipse(target.x, target.y, 25, 15, 0, 0, Math.PI * 2); c.stroke();
       c.beginPath(); c.moveTo(target.x - 35, target.y); c.lineTo(target.x + 35, target.y); c.moveTo(target.x, target.y - 24); c.lineTo(target.x, target.y + 24); c.stroke();
       if (receiver) {

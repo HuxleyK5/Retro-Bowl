@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node tests/simulation.test.mjs && node tests/match.test.mjs && node tests/playbook.test.mjs && node tests/ratings.test.mjs && node tests/league.test.mjs",
-    "test:browser": "node tests/browser.mjs && node tests/browser-playbook.mjs && node tests/browser-ratings.mjs && node tests/browser-league.mjs"
+    "test": "node tests/simulation.test.mjs && node tests/match.test.mjs && node tests/playbook.test.mjs && node tests/ratings.test.mjs && node tests/league.test.mjs && node tests/special-teams.test.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/browser-playbook.mjs && node tests/browser-ratings.mjs && node tests/browser-league.mjs && node tests/browser-pull.mjs && node tests/browser-special-teams.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0"

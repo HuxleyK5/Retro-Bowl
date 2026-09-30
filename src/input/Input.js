@@ -21,16 +21,34 @@ export class Input {
     canvas.addEventListener('blur', () => this.clear());
     const point = event => {
       const rect = canvas.getBoundingClientRect();
-      this.pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top, active: true };
+      this.pointer = { x: event.clientX - (this.drag?.left ?? rect.left), y: event.clientY - (this.drag?.top ?? rect.top), active: true };
     };
+    this.drag = null;
     canvas.addEventListener('pointermove', point);
-    canvas.addEventListener('pointerleave', () => { this.pointer.active = false; });
+    canvas.addEventListener('pointerleave', () => { if (!this.drag) this.pointer.active = false; });
     canvas.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || this.drag) return;
       canvas.focus({ preventScroll: true }); point(event);
-      if (event.button === 0) onAction('throw');
+      if (!onAction('aimStart')) return;
+      const rect = canvas.getBoundingClientRect();
+      this.drag = { x: this.pointer.x, y: this.pointer.y, id: event.pointerId, left: rect.left, top: rect.top };
+      canvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
     });
+    canvas.addEventListener('pointerup', event => {
+      if (!this.drag || event.pointerId !== this.drag.id || event.button !== 0) return;
+      point(event); onAction('throw'); this.cancelDrag();
+    });
+    this.cancelDrag = () => {
+      const id = this.drag?.id; this.drag = null;
+      if (id !== undefined && canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+    };
+    canvas.addEventListener('pointercancel', () => this.cancelDrag());
+    canvas.addEventListener('lostpointercapture', () => { this.drag = null; });
+    window.addEventListener('resize', () => this.cancelDrag());
   }
-  clear() { this.keys.clear(); }
+  clear() { this.keys.clear(); this.cancelDrag?.(); }
+
   get movement() {
     const has = (...codes) => codes.some(code => this.keys.has(code));
     let x = Number(has('KeyD', 'ArrowRight')) - Number(has('KeyA', 'ArrowLeft'));

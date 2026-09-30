@@ -54,7 +54,7 @@ export class Play {
     const slots = {};
     for (const player of this.players) {
       const teamId = player.team === 'home' ? possession : possession === 'home' ? 'away' : 'home';
-      const position = player.data.position, key = `${teamId}-${position}`;
+      const position = { QUARTERBACK: 'QB', 'RUNNING BACK': 'RB', RECEIVER: 'WR', LINEMAN: 'OL', DEFENDER: 'DEF' }[player.role], key = `${teamId}-${position}`;
       const index = slots[key] || 0; slots[key] = index + 1;
       const record = this.rosters[teamId]?.filter(data => data.position === position)[index];
       if (!record) throw new Error(`Missing roster slot ${key} ${index}`);
@@ -85,8 +85,8 @@ export class Play {
   }
   reset() {
     this.players.forEach(p => p.reset()); this.routes.reset(); this.ball.reset();
-    this.execution.reset();
-    this.blocking.reset(); this.catchJitter = 0;
+    this.execution.reset(); this.isKickoff = false;
+    this.blocking.reset(); this.catchJitter = 0; this.autoRunAfterCatch = false; this.catchSteeringReady = false;
     this.carrier = this.qb; this.controlled = this.qb; this.phase = 'presnap'; this.elapsed = 0;
     this.result = ''; this.notice = 'SPACE TO SNAP · Attack the right end zone →'; this.hasThrown = false; this.passDistance = 0; this.catchProtection = 0;
     this.ball.attach(this.qb);
@@ -95,7 +95,7 @@ export class Play {
   get canThrow() { return this.phase === 'passing' && this.carrier === this.qb && !this.hasThrown && this.qb.x < this.lineOfScrimmage && this.execution.canPass; }
   snap() {
     if (this.phase !== 'presnap') return false;
-    this.phase = 'passing'; this.notice = 'Aim at a receiver + click to lead them · H to hand off'; return true;
+    this.phase = 'passing'; this.notice = 'Hold mouse, pull back, release to pass · H to hand off'; return true;
   }
   handoff() {
     if (!this.canThrow || this.elapsed > 1.8 || distance(this.qb, this.rb) > 220) return false;
@@ -108,7 +108,7 @@ export class Play {
   juke(direction) { return this.live && !this.execution.locked && this.ball.mode === 'held' && this.carrier.juke(direction); }
   aim(point) {
     let receiver = null; let nearest = 100;
-    for (const p of this.receivers) { const d = distance(p, point); if (d < nearest) { receiver = p; nearest = d; } }
+    for (const p of point.manual ? [] : this.receivers) { const d = distance(p, point); if (d < nearest) { receiver = p; nearest = d; } }
     let target = { ...point };
     let duration = .6;
     for (let i = 0; i < 3; i++) {
@@ -154,23 +154,34 @@ export class Play {
       if (this.catchMargin(player, separation) + this.catchJitter < 0) continue;
       this.carrier = player; this.controlled = player; this.ball.attach(player);
       if (player.team === 'away') this.finish('INTERCEPTION', 'Defense takes possession.');
-      else { this.phase = 'running'; this.catchProtection = .25; this.notice = `CAUGHT BY #${player.number} · Run right! SHIFT sprint · J juke`; }
+      else {
+        this.phase = 'running'; this.autoRunAfterCatch = true; this.catchSteeringReady = false; this.catchProtection = .25;
+        // Commit to the end zone at the catch, rather than braking out of the receiver's route first.
+        player.vx = player.speed; player.vy = 0; player.facing = 1; player.moving = true;
+        this.notice = `CAUGHT BY #${player.number} / AUTO RUN / Release movement keys, then steer / SHIFT sprint / J juke`;
+      }
       return true;
     }
     return false;
   }
   finish(result, detail = '') {
     if (this.phase === 'dead') return;
-    this.phase = 'dead'; this.result = result;
+    this.phase = 'dead'; this.autoRunAfterCatch = false; this.catchSteeringReady = false; this.result = result;
     const yards = this.carrier ? Math.round((this.carrier.x - this.lineOfScrimmage) / this.field.yard) : 0;
     this.notice = `${detail || `${yards >= 0 ? '+' : ''}${yards} yards on the play.`} SPACE / R for a new play`;
     this.players.forEach(p => { p.moving = false; p.vx = 0; p.vy = 0; });
   }
-  update(dt, movement = still) {
+  update(dt, movement = still, computerControlled = false) {
     if (!this.live) return;
     this.elapsed += dt;
     this.catchProtection = Math.max(0, this.catchProtection - dt);
     movement = this.execution.movement(dt, movement);
+    if (this.autoRunAfterCatch && this.phase === 'running') {
+      const neutral = !movement.x && !movement.y;
+      if (neutral || computerControlled) this.catchSteeringReady = true;
+      // Keys held before the catch must not carry over from controlling the QB.
+      if (neutral || !this.catchSteeringReady) movement = { ...movement, x: 1, y: 0 };
+    }
     if (this.ball.mode === 'held') this.controlled.update(dt, movement, this.field);
     else this.qb.update(dt, still, this.field);
     for (const p of this.receivers) if (p !== this.carrier && !this.execution.receiverMovement(p, dt)) this.routes.update(p, dt, this.field);

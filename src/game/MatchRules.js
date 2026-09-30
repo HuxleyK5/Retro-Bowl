@@ -1,3 +1,4 @@
+import { kickExecution } from './KickMeter.js';
 export const TEAMS = { home: 'NORTHSIDE', away: 'EASTBANK' };
 
 const other = team => team === 'home' ? 'away' : 'home';
@@ -5,7 +6,6 @@ const other = team => team === 'home' ? 'away' : 'home';
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
 const ordinals = ['1ST', '2ND', '3RD', '4TH'];
-
 
 
 // Match rules use yards from the possessing team's own goal (0..100).
@@ -26,7 +26,7 @@ export class MatchRules {
 
     this.spot = 25; this.down = 1; this.firstDownLine = 35;
 
-    this.result = ''; this.detail = ''; this.next = null; this.kick = null; this.playNumber = 0;
+    this.result = ''; this.detail = ''; this.next = null; this.kick = null; this.playNumber = 0; this.kickoffPending = false;
 
   }
 
@@ -68,7 +68,7 @@ export class MatchRules {
 
     if (this.clockRunning) this.clock = Math.max(0, this.clock - dt);
 
-    if (this.phase === 'ready' || (this.phase === 'result' && !this.next)) {
+    if (this.phase === 'ready' || (this.phase === 'result' && !this.next && !this.kickoffPending)) {
 
       // Period expiry takes precedence over a play-clock violation.
 
@@ -126,9 +126,9 @@ export class MatchRules {
 
     if (type === 'SAFETY' || (end <= 0 && type !== 'INCOMPLETE')) {
 
-      this.addScore(other(this.possession), 2); this.changePossession(25);
+      this.addScore(other(this.possession), 2); this.changePossession(25); this.kickoffPending = true;
 
-      this.result = 'SAFETY · +2'; this.detail = `${this.teams[this.possession]} receives the free kick at its own 25.`; return true;
+      this.result = 'SAFETY · +2'; this.detail = `${this.teams[this.possession]} will receive the free kick.`; return true;
 
     }
 
@@ -170,7 +170,7 @@ export class MatchRules {
 
   }
 
-  beginKick(kind) {
+  beginKick(kind, execution = null) {
 
     const extra = kind === 'extraPoint';
 
@@ -182,6 +182,12 @@ export class MatchRules {
 
     else this.kick.good = this.random() < this.kick.chance;
 
+    if (execution) {
+      const specialist = this.specialists?.[this.possession]?.[kind === 'punt' ? 'punter' : 'kicker'];
+      const result = kickExecution(kind, specialist?.ratings, this.kick.distance, execution);
+      Object.assign(this.kick, result);
+      if (kind === 'punt') this.kick.landing = this.spot + result.yards;
+    }
     this.phase = 'kick'; this.clockRunning = !extra; this.playNumber++; return true;
 
   }
@@ -217,6 +223,7 @@ export class MatchRules {
       // or the receiving team's 20, whichever gives them better field position.
 
       this.changePossession(kind === 'extraPoint' || good ? 25 : Math.max(20, 100 - (from - 7)));
+      this.kickoffPending = kind === 'extraPoint' || good;
 
       this.detail += ` ${this.teams[this.possession]} ball, ${this.spotLabel.toLowerCase()}.`;
 
@@ -230,9 +237,9 @@ export class MatchRules {
 
     if (this.phase === 'halftime') {
 
-      this.quarter = 3; this.clock = this.quarterSeconds; this.possession = 'away'; this.newSeries(25);
+      this.kickoffPending = true; this.quarter = 3; this.clock = this.quarterSeconds; this.possession = 'away'; this.newSeries(25);
 
-      this.clockRunning = false; this.ready(); this.detail = `Second-half kickoff: ${this.teams.away} receives at its own 25.`; return true;
+      this.clockRunning = false; this.ready(); this.detail = `Second-half kickoff: ${this.teams.away} receives.`; return true;
 
     }
 
@@ -254,7 +261,7 @@ export class MatchRules {
 
     this.clockRunning = false;
 
-    if (this.quarter === 4) { this.phase = 'final'; return; }
+    if (this.quarter === 4) { this.kickoffPending = false; this.phase = 'final'; return; }
 
     if (this.quarter === 2) { this.phase = 'halftime'; return; }
 

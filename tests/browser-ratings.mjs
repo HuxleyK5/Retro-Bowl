@@ -34,7 +34,7 @@ try {
   await page.screenshot({path:'test-results/phase5-ratings-qb.png',fullPage:true});
   await page.keyboard.press('Escape'); await expect(page.locator('#ratings-panel')).toBeHidden();
   assert.equal((await state()).playing,true);assert.equal((await state()).phase,'pregame');
-  await page.locator('#screen-action').click();await page.locator('#game').focus();await page.keyboard.press('Space');await page.waitForTimeout(200);
+  await page.locator('#screen-action').click(); await page.evaluate(async()=>{(await import('/src/main.js')).match.start(120,false)});await page.locator('#game').focus();await page.keyboard.press('Space');await page.waitForTimeout(200);
   await page.locator('#ratings-toggle').click();const frozen=await state();await page.waitForTimeout(250);assert.deepEqual(await state(),frozen);
   await page.locator('#ratings-close').click();assert.equal((await state()).playing,true);await page.waitForTimeout(100);assert.ok((await state()).elapsed>frozen.elapsed);
   await page.keyboard.press('Escape');assert.equal((await state()).playing,false);

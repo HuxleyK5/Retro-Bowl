@@ -1,3 +1,5 @@
+import { KickMeterPanel } from './ui/KickMeterPanel.js';
+import { pullTarget } from './input/PullPass.js';
 import { createLeague } from './data/League.js';
 import { saveFranchise, loadFranchise } from './data/Franchise.js';
 import { TeamSelection } from './ui/TeamSelection.js';
@@ -37,18 +39,27 @@ const state = new GameState(mode => {
 });
 const action = name => {
   if (selecting || !state.playing) return;
-  match.action(name, input.movement, camera.screenToWorld(input.pointer));
+  if (name === 'aimStart') {
+    if (match.rules.phase === 'kickMeter') { match.lockKick(); return false; }
+    if (!match.humanTurn) return false;
+    if (match.rules.phase === 'ready') match.snap();
+    return match.rules.phase === 'live' && play.phase === 'passing' && play.call?.type !== 'run';
+  }
+  const target = name === 'throw' ? pullTarget(play.qb, input.drag, input.pointer) : camera.screenToWorld(input.pointer);
+  if (name === 'throw' && !target) return;
+  match.action(name, input.movement, target);
   canvas.focus({ preventScroll: true });
 };
 const input = new Input(canvas, name => {
   if (selecting) return;
   if (name === 'pause') { state.togglePause(); return; }
-  action(name);
+  return action(name);
 }, () => { if (!selecting) state.set('paused'); });
 const ratings = new RatingsPanel(play, state, () => {
   const screen = ['pregame', 'halftime', 'quarterBreak', 'final'].includes(match.rules.phase);
   document.querySelector(screen ? '#screen-action' : '#game').focus({ preventScroll: true });
 });
+const kickMeter = new KickMeterPanel(match, () => action('snap'));
 const playbook = new PlaybookPanel(match, id => {
   if (!state.playing || !match.selectPlay(id)) return;
   input.clear(); camera.follow(play.controlled, 0, true); canvas.focus({ preventScroll: true });
@@ -61,7 +72,7 @@ document.querySelector('#punt').addEventListener('click', () => action('punt'));
 document.querySelector('#screen-action').addEventListener('click', () => {
   if (selecting || !state.playing) return;
   if (match.rules.phase === 'pregame') match.start(Number(document.querySelector('#quarter-length').value));
-  else if (match.rules.phase === 'final') { match.rules.reset(); play.configure(25); }
+  else if (match.rules.phase === 'final') { match.rules.reset(); match.meter = null; play.configure(25); }
   else match.advance();
   input.clear(); camera.follow(play.controlled, 0, true);
   canvas.focus({ preventScroll: true });
@@ -78,13 +89,17 @@ const loop = new GameLoop(dt => {
   match.update(dt, input.movement);
   camera.follow(play.ball.mode === 'flight' ? play.ball : play.controlled, dt);
 }, () => {
-  const canAim = input.pointer.active && state.playing && match.humanTurn && match.rules.phase === 'live' && play.canThrow;
-  const aim = canAim ? play.aim(camera.screenToWorld(input.pointer)) : null;
+  const canHold = input.drag && state.playing && match.humanTurn && match.rules.phase === 'live' && play.phase === 'passing' && play.call?.type !== 'run';
+  if (!canHold) input.cancelDrag();
+  const canAim = canHold && play.canThrow;
+  const target = canAim ? pullTarget(play.qb, input.drag, input.pointer) : null;
+  const aim = target ? play.aim(target) : null;
   const selected = match.humanTurn && play.phase !== 'flight' && match.rules.phase !== 'kick' ? play.controlled : null;
   renderer.render(play.players, selected, play, aim);
   if (selecting) return;
   hud.update(!state.playing);
   playbook.update(!state.playing);
+  kickMeter.update(!state.playing);
 });
 let saved = null;
 try { saved = loadFranchise(localStorage); } catch { /* Storage may be disabled. */ }
@@ -94,7 +109,7 @@ const selection = new TeamSelection(league, saved, (chosenLeague, teamId) => {
   const away = league[(league.indexOf(home) + 1) % league.length];
   play.rosters = { home: home.roster, away: away.roster };
   match.rules.teams = { home: `${home.city} ${home.name}`, away: `${away.city} ${away.name}` };
-  match.rules.reset(); match.phaseAge = 0; play.configure(25); hud.screenPhase = null;
+  match.rules.reset(); match.meter = null; match.phaseAge = 0; play.configure(25); hud.screenPhase = null;
   renderer.teams = { home, away };
   match.rules.specialists = Object.fromEntries(Object.entries({ home, away }).map(([side,t]) => [side, { kicker:t.roster.find(p=>p.position==='K'), punter:t.roster.find(p=>p.position==='P') }]));
   for (const [side, team] of Object.entries({ home, away })) {

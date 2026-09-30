@@ -158,3 +158,36 @@ test('camera stays within field margins and converges on target at multiple view
     assert.ok(camera.x + w / camera.zoom / 2 <= field.width + field.margin + .01);
   }
 });
+
+test('catch auto-runs forward, manual steering overrides, release resumes, whistle and reset stop it', () => {
+  for (const slot of [0, 4]) {
+    const play = makePlay(), receiver = play.receivers[slot];
+    play.snap(); play.defenders.forEach(p => { p.x = 2300; p.y = 1000; });
+    receiver.x = 1100; receiver.y = 500; receiver.vx = receiver.vy = 0;
+    play.ball.x = receiver.x; play.ball.y = receiver.y; play.phase = 'flight';
+    assert.equal(play.resolveCatch(), true);
+    assert.equal(play.controlled, receiver); assert.equal(play.autoRunAfterCatch, true);
+    advance(play, 20); assert.ok(receiver.x > 1120, 'runs without input after WR or RB reception');
+    const y = receiver.y;
+    advance(play, 20, { x: 0, y: -1 }); assert.ok(receiver.y < y - 20, 'manual steering');
+    const x = receiver.x;
+    advance(play, 20); assert.ok(receiver.x > x + 20, 'forward running resumes');
+    play.finish('TACKLED'); const stopped = receiver.x;
+    advance(play, 20); assert.equal(receiver.x, stopped); assert.equal(play.autoRunAfterCatch, false);
+    play.reset(); play.snap(); const qbX = play.qb.x;
+    advance(play, 10); assert.equal(play.qb.x, qbX); assert.equal(play.autoRunAfterCatch, false);
+  }
+});
+
+test('catch instantly turns route momentum forward and ignores inherited QB steering until release', () => {
+  const play = makePlay(), receiver = play.receivers[0];
+  play.snap();play.defenders.forEach(p=>{p.x=2300;p.y=1000;});
+  Object.assign(receiver,{x:1100,y:500,vx:-receiver.speed,vy:100,facing:-1});
+  Object.assign(play.ball,{x:1100,y:500});play.phase='flight';
+  assert.equal(play.resolveCatch(),true);
+  assert.equal(receiver.vx,receiver.speed);assert.equal(receiver.vy,0);assert.equal(receiver.facing,1);assert.equal(receiver.moving,true);
+  play.update(dt,{x:-1,y:0});assert.ok(receiver.x>1100);assert.equal(receiver.y,500);
+  advance(play,10,{x:-1,y:0});assert.ok(receiver.vx>0,'held QB direction cannot stop auto-run');
+  play.update(dt,{x:0,y:0});
+  advance(play,30,{x:-1,y:0});assert.ok(receiver.vx<0,'fresh steering works after releasing keys');
+});

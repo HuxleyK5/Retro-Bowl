@@ -1,3 +1,4 @@
+import { pullPass } from './pull-helper.mjs';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { expect } from '@playwright/test';
@@ -10,7 +11,7 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', e => { if (e.type() === 'error') errors.push(e.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  await page.goto('http://localhost:5173'); await page.locator('#start-franchise').click(); await page.locator('#screen-action').click();
+  await page.goto('http://localhost:5173'); await page.locator('#start-franchise').click(); await page.locator('#screen-action').click(); await page.evaluate(async()=>{(await import('/src/main.js')).match.start(120,false)});
   const read = () => page.evaluate(async () => {
     const { play, match } = await import('/src/main.js');
     return { id: play.call?.id, phase: match.rules.phase, playPhase: play.phase, elapsed: play.elapsed, carrier: play.carrier?.number, canThrow: play.canThrow, clock: match.rules.clock, playClock: match.rules.playClock, down: match.rules.down, spot: match.rules.spot, routes: play.receivers.map(p => p.route), rb: { x: play.rb.x, y: play.rb.y }, guided: play.execution.guided };
@@ -21,7 +22,7 @@ try {
     assert.fail(JSON.stringify(await read()));
   };
   const prepare = async () => {
-    await page.evaluate(async () => { const {match,state,play} = await import('/src/main.js'); state.set('playing'); match.start(120); play.random = () => .4; });
+    await page.evaluate(async () => { const {match,state,play} = await import('/src/main.js'); state.set('playing'); match.start(120, false); play.random = () => .4; });
     await page.locator('#game').focus(); await page.waitForTimeout(80);
   };
   assert.equal(await page.locator('[data-play]').count(), 12);
@@ -59,10 +60,8 @@ try {
   assert.equal((await read()).canThrow, false); await waitFor(v => v.canThrow); assert.equal((await read()).carrier, '01');
   await prepare(); await page.locator('[data-play="screen"]').click(); await page.keyboard.press('Space');
   await page.waitForTimeout(1000);
-  const target = await page.evaluate(async () => {
-    const {play,camera} = await import('/src/main.js'); const p = camera.worldToScreen(play.rb); const r = document.querySelector('#game').getBoundingClientRect(); return {x:p.x+r.left,y:p.y+r.top};
-  });
-  await page.mouse.click(target.x,target.y); await waitFor(v => v.playPhase === 'running'); assert.equal((await read()).carrier, '04');
+  const target = await page.evaluate(async () => { const {play}=await import('/src/main.js');return {x:play.rb.x,y:play.rb.y}; });
+  await pullPass(page,target); await waitFor(v => v.playPhase === 'running'); assert.equal((await read()).carrier, '04');
   for (const [width,height] of [[960,720],[540,800]]) {
     await prepare(); await page.setViewportSize({width,height}); await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);

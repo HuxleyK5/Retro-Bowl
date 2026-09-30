@@ -26,12 +26,12 @@ Each deterministic 53-player roster has 3 QB, 4 RB, 6 WR, 3 TE, 9 OL, 8 DL, 7 LB
 | Space / contextual button | Snap, continue after a play, or kick the extra point |
 | Play buttons / Q and E | Choose a play or cycle audibles before the snap |
 | Roster / Ratings button | Inspect both teams; pauses the game and restores the previous pause state on close |
-| Mouse + left click | Aim and throw one pass from behind the blue line of scrimmage |
+| Mouse + left click | Hold, pull opposite your intended throw, then release behind the blue line of scrimmage |
 | WASD / arrow keys | Move QB or ball carrier |
 | Shift | Sprint |
 | J + direction | Juke; duration and cooldown depend on elusiveness and awareness (J alone dodges upward) |
 | H | Hand off to the nearby running back within 1.8 seconds of the snap |
-| F / Field Goal button | Attempt a field goal before the snap; distance and success chance shown |
+| F / Field Goal button | Open the field-goal meter before the snap; distance is shown |
 | K / Punt button | Punt before the snap |
 | Escape / P / Pause button | Pause or resume the game and both clocks |
 | R | Continue after a whistle; cannot erase or replay an active down |
@@ -50,7 +50,7 @@ Every player has a stable ID, name, jersey number, team, position and validated 
 | OL | Strength, Blocking and Awareness determine pocket protection; Awareness also expands engagement reach |
 | DEF | Speed controls pursuit; Strength helps shed blocks and finish tackles; Tackling controls reach and contact; Coverage tightens marking and improves interceptions; Pass Rush sheds blocks faster; Awareness improves reaction and pursuit angles |
 
-Blocking and tackling are deterministic rating contests. Repeated broken tackles become harder so powerful runners are not invulnerable. Passing has bounded dispersion; catches use a skill-versus-difficulty margin with only ±0.02 execution variation, sampled once per pass. Clear catches and clear failures do not flip with a random roll. Kicker accuracy and power modify distance-based odds; punter power affects distance.
+Blocking and tackling are deterministic rating contests. Repeated broken tackles become harder so powerful runners are not invulnerable. Passing has bounded dispersion; catches use a skill-versus-difficulty margin with only ±0.02 execution variation, sampled once per pass. Clear catches and clear failures do not flip with a random roll. Human kicks use power and accuracy timing, with specialist ratings affecting distance and the accuracy window. CPU field goals and extra points retain distance-based odds.
 
 `src/data/PlayerData.js` stores persistent data separately from `Player` field state. `src/data/Rosters.js` provides versioned JSON serialization and reconstruction. Ratings survive play resets, audibles and possession swaps; each team keeps its own records. The league snapshot saves club choice and all player records locally; in-progress matches and season management are not yet persisted. See [the rating model and formulas](docs/ratings.md).
 
@@ -81,7 +81,7 @@ Add an immutable definition to `src/football/Playbook.js`, with a unique `id`, n
 
 ## Playing
 
-Your club receives the opening touchback at its own 25. Before each snap, dashed routes show where your receivers will run. The blue line marks scrimmage; the gold line marks the first down or goal line. Wait roughly a second after snapping for receivers to separate, point at a receiver to preview a led pass, and click to throw. Point at open grass for manual targeting. On a catch, control transfers automatically. Run, sprint and juke to gain yards.
+Your club returns the opening kickoff before its first offensive drive. Before each snap, dashed routes show where your receivers will run. The blue line marks scrimmage; the gold line marks the first down or goal line. Wait roughly a second after snapping for receivers to separate, hold the mouse and pull opposite the intended throw direction. Use the dotted arc to aim ahead of a receiver, then release. On a catch, control transfers automatically. Run, sprint and juke to gain yards.
 
 Accuracy, pressure and QB movement affect throw dispersion. Difficult/contested catches depend on receiver catching ratings. Defenders cover, rush, pursue, tackle and intercept. The opponent uses those same systems when it has the ball. Both offenses are displayed moving right so the controls and camera remain consistent; possession changes correctly reverse field position in the match rules.
 
@@ -90,16 +90,16 @@ Accuracy, pressure and QB movement affect throw dispersion. Difficult/contested 
 - Four downs to gain ten yards. First downs reset the series. Inside the opponent's ten, the series is goal-to-go; a loss does not move the goal line.
 - Four failed downs or an interception switch possession and reverse the yard-line reference. End-zone interceptions are touchbacks; interceptions in the throwing team's own end zone score for the defense. Interception returns are not simulated.
 - Touchdowns score six. An untimed extra-point kick follows, worth one. Field goals score three. Safeties score two for the defense and give it the next possession.
-- Field-goal distance includes the end zone and a seven-yard hold. Misses give the opponent the kick spot or its own 20, whichever is better for the receiving team. Long kicks have a lower success chance.
-- Punts travel 36–51 yards. No returns; a punt into the end zone is a touchback at the 20.
-- Kickoffs after scores and at the start of each half are automatic touchbacks at the 25. Safety free kicks also give the receiver its own 25.
+- Field-goal distance includes the end zone and a seven-yard hold. Misses give the opponent the kick spot or its own 20, whichever is better for the receiving team. Long kicks require more power and tighter accuracy timing.
+- Punt distance depends on power timing, accuracy, and punter ratings. Punt returns are not simulated; a punt into the end zone is a touchback at the 20.
+- Kickoffs at the start of each half, after scores, and following safeties enter a return phase. A kickoff reaching the end zone is an automatic touchback at the 25. In-field kicks are caught by the returner; the game clock starts at the catch.
 - The game clock runs during ordinary live plays and kicks, and continues between in-bounds plays. It stops for incompletions, out-of-bounds plays, possession changes, scores and breaks. It never runs on an extra point.
 - The 40-second play clock counts down before the snap and on the result screen. Delay of game costs five yards or half the distance to the goal; the down and line to gain remain unchanged. The play clock resets to 25 after the penalty.
 - A live play or kick finishes even if the game clock reaches 0:00. A touchdown's extra point is resolved in the same quarter before the period ends.
 - Quarter one/three transitions preserve possession, ball position and downs. Halftime stops both clocks; the opponent receives the second-half kickoff with a fresh series.
 - The fourth quarter ends in a final-score screen. Regulation ties stand. New Game clears all scores and returns to setup.
 
-This is an intentionally simplified exhibition ruleset, not a specific league's full rulebook. No overtime, timeouts, two-minute warning, two-point conversions, kick returns, fumbles, penalty catalog or franchise management yet. Out-of-bounds plays always stop the game clock. A 35-second live-play limit prevents endless individual plays.
+This is an intentionally simplified exhibition ruleset, not a specific league's full rulebook. No overtime, timeouts, two-minute warning, two-point conversions, punt returns, fumbles, penalty catalog or franchise management yet. Out-of-bounds plays always stop the game clock. A 35-second live-play limit prevents endless individual plays.
 
 ## Architecture
 
@@ -133,6 +133,22 @@ Run `npm test` for the simulation and match-rules suites. These cover the existi
 
 The playbook suite additionally verifies distinct live route trajectories, open-field completions for all passing concepts, all run exchange timings and lanes, the delayed draw, screen blocking, play-action lockout, steering overrides, audibles without clock resets, CPU execution and boundary-safe routes. `tests/browser-playbook.mjs` checks all twelve UI choices, formation previews, keyboard audibles, run handoffs, a mouse screen completion, pause/live/CPU restrictions and desktop/narrow layouts.
 
-The ratings suite compares low/high ratings under identical conditions: speed/acceleration, throw power, accuracy across seeds, awareness, cuts, difficult catches, interceptions, real pocket time, broken tackles and jukes. It also verifies data validation, independent teams, persistent changes and serialization. `tests/browser-ratings.mjs` checks both rosters, every required displayed stat, pause/resume and keyboard focus, plus responsive layouts. The suite includes 67 simulation/data checks and four browser suites. The league checks cover 24 rosters, unique identities, metadata, actual lineup binding, saved snapshots, malformed saves, and specialist abilities.
+The ratings suite compares low/high ratings under identical conditions: speed/acceleration, throw power, accuracy across seeds, awareness, cuts, difficult catches, interceptions, real pocket time, broken tackles and jukes. It also verifies data validation, independent teams, persistent changes and serialization. `tests/browser-ratings.mjs` checks both rosters, every required displayed stat, pause/resume and keyboard focus, plus responsive layouts. The suite includes 76 simulation/data checks and six browser suites. The league checks cover 24 rosters, unique identities, metadata, actual lineup binding, saved snapshots, malformed saves, and specialist abilities.
 
 For browser verification, run `npm install`, keep the server running, and run `npm run test:browser`. Playwright uses installed Microsoft Edge. Checks include actual mouse/keyboard touchdown and PAT, CPU possessions, special teams, penalty UI, pause/focus loss, scoreboard, resizing and passing at four viewport sizes, halftime/final/new-game screens, and zero console/network errors. Full-match browser tests accelerate tick delivery with ten-second test quarters while preserving the real rules and gameplay; isolated scenarios set starting field position for edge-case checks. Screenshots are saved in `test-results/`.
+
+Passing: hold the left mouse button anywhere on the field after the snap, pull back, and release. A longer pull adds distance (full power at 180 screen pixels). Dots preview the flight arc and a ring marks the landing point. Aim ahead of moving receivers; QB accuracy still adds dispersion. Tiny clicks do not throw. Pause, focus loss, or window resizing cancels the gesture.
+
+After a reception, the ball carrier automatically runs toward the right end zone. WASD or arrows override the direction while held; releasing them resumes forward running. Shift still sprints and J still jukes. Auto-run ends at the whistle and resets before the next play.
+
+The catch immediately sets forward running velocity, including on curls and crossing routes. Movement keys already held at the catch are ignored until released; press a direction again to steer. Computer-controlled runners continue using their normal pursuit-avoidance AI.
+
+Starting a mouse pull on the field now snaps your selected play automatically. Keep holding to aim, then release to throw. Space still snaps. Run calls execute their handoff; play-action throws unlock after the fake.
+
+## Kicking meters and kickoff returns
+
+Choose **F** for a field goal, **K** for a punt, or **Space** for an extra point. Press **Space** (or click the meter button) to lock power, then press again when the needle crosses the center line to kick straight. More power means more distance. Each stage allows five seconds; letting it expire produces a weak or inaccurate kick. Pause freezes the meter and both clocks. Human kick results use timing and player attributes rather than a random roll.
+
+After a successful field goal or any extra-point attempt, continue to the kickoff. Your team's kickoffs also use the meter. Short kicks allow returns; deep kicks reaching the end zone produce touchbacks. Opening and CPU kickoffs are automatic. The returner catches and runs immediately; **WASD/arrows** steer, **Shift** sprints, and **J** jukes. A tackle or sideline exit sets up first down at the return spot; a return touchdown scores six and leads to a PAT. CPU returns use the existing runner AI. Punt returns, onside kicks, fair catches and selectable end-zone returns are not included.
+
+`KickMeter.js` holds timing and kick formulas; `KickoffReturn.js` manages the kick flight and return setup; `KickMeterPanel.js` draws the timing controls. Tests cover meters, missed/made kicks, opening/halftime/scoring kickoffs, return outcomes, touchbacks, quarter-end scoring, and actual browser controls.
