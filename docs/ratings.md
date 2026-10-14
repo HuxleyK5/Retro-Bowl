@@ -31,7 +31,7 @@ Team IDs and player IDs must match when loading a roster; duplicate IDs are reje
 
 ## Movement and route running
 
-The world uses 20 pixels per yard. Running speed is `90 + Speed` pixels/second; sprint multiplies by 1.5. Acceleration is `340 + 2 × Speed + 3.2 × Acceleration` pixels/second². Thus faster players also start faster, while the Acceleration rating separately improves time to top speed. Input remains immediate and directional movement stays normalized by the input system.
+The world uses 20 pixels per yard. Running speed is `120 + 0.65 × Speed` pixels/second; sprint multiplies by 1.25. This narrows the gap between slower defenders and offensive runners while preserving an advantage for faster players. A juke gives a brief 1.35× burst; sprint and juke use the stronger boost rather than multiplying together. Acceleration is `340 + 2 × Speed + 3.2 × Acceleration` pixels/second². Thus faster players also start faster, while the Acceleration rating separately improves time to top speed. Input remains immediate and directional movement stays normalized by the input system.
 
 On routes, steering acceleration is multiplied by `0.45 + 0.007 × Route Running`. Higher route running allows sharper direction changes and less overshoot. Waypoint tolerance is `6 + (99 − Route Running) × 0.25` pixels: low-rated players round their breaks earlier. Awareness adds `(99 − Awareness) × 0.0015` seconds of release reaction, on top of a play's scripted delay. Led throws predict using the same rated acceleration and cuts as actual route movement, without mutating the receiver.
 
@@ -50,12 +50,14 @@ Catch margin is based on Catching and Awareness, minus reach/stretch, nearby cov
 
 Block skill is `0.55 × Blocking + 0.30 × Strength + 0.15 × Awareness`. Rush skill is `0.50 × Pass Rush + 0.30 × Strength + 0.20 × Awareness`. An engagement lasts `2.2 + (block skill − rush skill) × 0.035` seconds, clamped to 0.35–4.5. Higher-awareness linemen engage over a wider radius. Each defender/blocker pair has one timed engagement per play, preventing an expired block from restarting every frame.
 
-Coverage reduces the defender's trailing and lateral cushion. Awareness reduces pass-read delay (`0.65 − 0.0045 × Awareness` seconds), expands the pass reaction radius, reduces susceptibility to the play-action fake and increases velocity-based pursuit anticipation. Defensive Speed uses the same movement formula as offense.
+Coverage reduces the defender's goal-side and inside cushion. Awareness reduces pass-read delay (`0.65 − 0.0045 × Awareness` seconds), expands the pass reaction radius, reduces susceptibility to the play-action fake and increases velocity-based pursuit anticipation. Coverage reads delayed samples of actual receiver movement, so sharp route breaks can create separation without defenders knowing the next waypoint. Deep help protects the middle; pursuit computes a bounded intercept point from the carrier's velocity and maintains outside containment near the sidelines. Defensive Speed uses the same movement formula as offense.
 
 ## Contact, strength and jukes
 
 Tackle skill combines 60% Tackling, 25% Strength and 15% Awareness. Tackling also sets contact reach (`20 + 0.12 × Tackling` pixels). Runner resistance combines 55% Strength, 30% Elusiveness, 15% Awareness and a small momentum bonus. To break contact, resistance must exceed tackle skill plus 25. Each successful broken tackle subtracts 18 from future resistance that play and reduces the runner's current momentum. No tackle coin flip is used.
 
 A well-timed active juke compares Elusiveness, Awareness and Strength against tackle skill. Better defenders can stop poor jukes. Elusiveness increases the effective dodge radius; it and Awareness extend the active window and shorten cooldown. Awareness also lets CPU carriers identify nearby threats earlier. User steering never depends on an AI reaction delay.
+
+Fumble security combines 45% Awareness, 30% Strength and 25% Catching. Hit strength combines 60% Tackling, 25% Strength and 15% Awareness. Momentum and side contact increase the chance of losing the ball, capped at 14% per tackle. A single contact roll starts a physical loose-ball scramble; recovery follows player position rather than a possession coin flip. Offensive recoveries continue the play, including recoveries by linemen. Defensive recoveries and end-zone exits feed the normal possession and scoring rules.
 
 Formula definitions live in `src/football/RatingEffects.js`; live comparisons and serialization checks live in `tests/ratings.test.mjs`.

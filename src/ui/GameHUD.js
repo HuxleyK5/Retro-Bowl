@@ -23,7 +23,7 @@ export class GameHUD {
     this.text('ball-spot', r.spotLabel); this.text('possession', `${r.teams[r.possession]} BALL →`);
     document.getElementById('home-team').classList.toggle('has-ball', r.possession === 'home');
     document.getElementById('away-team').classList.toggle('has-ball', r.possession === 'away');
-    this.text('state-label', paused ? 'GAME PAUSED' : `${names[r.phase]}${!this.match.humanTurn && ['ready', 'live', 'kick'].includes(r.phase) ? ' · CPU' : ''}`);
+    this.text('state-label', paused ? 'GAME PAUSED' : p.phase === 'loose' ? 'FUMBLE / BALL LOOSE' : `${names[r.phase]}${!this.match.humanTurn && ['ready', 'live', 'kick'].includes(r.phase) ? ' · CPU' : ''}`);
     let notice = r.detail;
     if (r.phase === 'ready') notice = this.match.humanTurn ? `${p.call?.name || 'Offense'} · Q / E audible · SPACE snap · Play clock keeps running` : `${r.teams.away} is calling a play. Watch your defense work.`;
     if (r.phase === 'live') notice = this.match.humanTurn ? p.notice : `${r.teams.away} OFFENSE / Computer-controlled possession`;
@@ -42,7 +42,7 @@ export class GameHUD {
     document.querySelector('.line-legend').hidden = !!p.isKickoff;
     this.text('player-label', r.phase === 'kickMeter' ? `YOU / KICKER #${p.qb.number} ${p.qb.data.name}` : `${this.match.humanTurn ? 'YOU' : 'CPU'} / ${p.controlled.number} ${p.controlled.data.name}`);
     this.text('position-label', `BALL ${r.spotLabel}`);
-    this.text('juke-label', !this.match.humanTurn ? 'WATCHING DEFENSE' : p.controlled.jukeCooldown > 0 ? `JUKE ${p.controlled.jukeCooldown.toFixed(1)}s` : 'JUKE READY');
+    this.text('juke-label', p.phase === 'loose' ? 'RECOVER THE BALL' : !this.match.humanTurn ? 'WATCHING DEFENSE' : p.controlled.jukeCooldown > 0 ? `JUKE ${p.controlled.jukeCooldown.toFixed(1)}s` : 'JUKE READY');
     e.snap.hidden = !['ready', 'result', 'extraPoint'].includes(r.phase) || (!this.match.humanTurn && r.phase !== 'result');
     e.snap.disabled = paused;
     this.text('snap', r.phase === 'result' ? 'CONTINUE →' : r.phase === 'extraPoint' ? 'KICK EXTRA POINT →' : 'SNAP BALL →');

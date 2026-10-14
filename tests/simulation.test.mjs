@@ -38,6 +38,24 @@ test('acceleration ramps smoothly, diagonal movement preserves speed, and juke h
   assert.equal(p.juke({ x: 1, y: 0 }), true);
 });
 
+test('sprint gives a modest boost and an active juke cannot stack speed beyond its burst', () => {
+  const p = new Player({x: 600, y: 500, ratings: {speed: 80, acceleration: 85, elusiveness: 90, awareness: 90}});
+  const field = new Field(), direction = {x: Math.SQRT1_2, y: Math.SQRT1_2};
+  for (let i = 0; i < 60; i++) p.update(dt, {...direction, sprint: true}, field);
+  assert.ok(Math.abs(Math.hypot(p.vx, p.vy) - p.speed * 1.25) < .001);
+  assert.equal(p.juke(direction), true);
+  assert.ok(Math.hypot(p.vx, p.vy) <= p.speed * 1.35 + .001, 'juke impulse stays within the burst cap');
+  for (let i = 0; i < 30; i++) {
+    p.update(dt, {...direction, sprint: true}, field);
+    assert.ok(Math.hypot(p.vx, p.vy) <= p.speed * 1.35 + .001, 'holding sprint during a juke does not multiply boosts');
+  }
+  assert.equal(p.jukeTime, 0); assert.ok(p.jukeCooldown > 0);
+  assert.ok(Math.abs(Math.hypot(p.vx, p.vy) - p.speed * 1.25) < .001, 'speed returns to sprint pace after the juke');
+  for (let i = 0; i < 60; i++) p.update(dt, direction, field);
+  assert.ok(Math.abs(Math.hypot(p.vx, p.vy) - p.speed) < .001, 'releasing sprint returns to normal pace');
+  assert.equal(p.juke(direction), true, 'cooldown still allows the next timed juke');
+});
+
 test('pre-snap formation is fixed, snap starts routes and coverage, and idle QB is sacked', () => {
   const p = makePlay(); const start = p.players.map(v => [v.x, v.y]);
   advance(p, 60, { x: 1, y: 0 }); assert.deepEqual(p.players.map(v => [v.x, v.y]), start);
@@ -56,21 +74,25 @@ test('airborne ball follows an arc and arrives at the target', () => {
 });
 
 test('real routed pass is caught, control transfers, defenders pursue, and carrier can be tackled', () => {
-  const p = makePlay(); p.snap(); advance(p, 60);
+  const p = makePlay(); p.configure(35, 'home', 45, 'outs'); p.snap(); advance(p, 60);
   assert.equal(p.throw(p.receivers[0]), true); assert.equal(p.phase, 'flight'); assert.equal(p.carrier, null);
   assert.equal(p.throw(p.receivers[1]), false);
   for (let i = 0; i < 150 && p.phase === 'flight'; i++) p.update(dt);
   assert.equal(p.phase, 'running'); assert.equal(p.carrier, p.receivers[0]); assert.equal(p.controlled, p.carrier);
   const defenderDistance = Math.min(...p.defenders.map(d => distance(d, p.carrier)));
   advance(p, 10); assert.ok(Math.min(...p.defenders.map(d => distance(d, p.carrier))) < defenderDistance);
-  advance(p, 600); assert.equal(p.result, 'TACKLED');
+  advance(p, 600, { x: -1, y: 0 }); assert.equal(p.result, 'TACKLED');
 });
 
-test('each receiver and the RB can complete a full snap-to-catch-to-touchdown play', () => {
+test('each receiver and the RB can complete a full snap-to-catch-to-breakaway touchdown with an open lane', () => {
   for (let index = 0; index < 5; index++) {
-    const p = makePlay(); p.snap(); advance(p, 60); p.throw(p.receivers[index]);
+    // #19 wins a deep vertical window; the other receivers break open on outs.
+    const p = makePlay(); p.configure(35, 'home', 45, index === 3 ? 'go' : 'outs'); p.snap();
+    advance(p, index === 3 ? 150 : 60); p.throw(p.receivers[index]);
     for (let i = 0; i < 180 && p.phase === 'flight'; i++) p.update(dt);
     assert.equal(p.carrier, p.receivers[index]);
+    // Establish a breakaway after the real catch; pursuing defenders stay active.
+    for (const defender of p.defenders) defender.x = Math.min(defender.x, p.carrier.x - 100);
     for (let i = 0; i < 1000 && p.live; i++) {
       if (i % 90 === 0) p.juke({ x: 1, y: 0 });
       p.update(dt, { x: 1, y: 0, sprint: true });

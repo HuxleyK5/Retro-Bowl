@@ -31,8 +31,12 @@ export class PlayRenderer {
     }
     if (play.canThrow && aim) {
       const { target, receiver } = aim;
-      c.strokeStyle = receiver ? '#edff9e' : '#fff3ca'; c.lineWidth = 2; c.setLineDash([9, 10]);
-      c.setLineDash([]); c.fillStyle = '#fff3ca';
+      const nearestDefender = Math.min(...play.defenders.map(player => Math.hypot(player.x - target.x, player.y - target.y)));
+      const suppliedRisk = typeof aim.risk === 'object' ? aim.risk?.level : aim.risk;
+      const risk = typeof suppliedRisk === 'number' ? suppliedRisk : suppliedRisk === 'danger' || suppliedRisk === 'high' ? 1 : suppliedRisk === 'contested' || suppliedRisk === 'medium' ? .55 : suppliedRisk === 'open' || suppliedRisk === 'low' ? 0 : nearestDefender < 60 ? 1 : nearestDefender < 125 ? .55 : 0;
+      const color = risk >= .72 ? '#ffad89' : risk >= .35 ? '#f5d781' : '#edff9e';
+      const read = risk >= .72 ? 'TIGHT WINDOW' : risk >= .35 ? 'CONTESTED' : receiver ? 'OPEN WINDOW' : 'AIMED PASS';
+      c.strokeStyle = color; c.lineWidth = 2; c.setLineDash([]); c.fillStyle = color;
       const dots = Math.max(12, Math.ceil(Math.hypot(target.x-play.qb.x, target.y-play.qb.y)/22));
       for (let i = 0; i <= dots; i++) {
         const t = i / dots;
@@ -43,9 +47,11 @@ export class PlayRenderer {
       c.fillText('RELEASE TO THROW', play.qb.x, play.qb.y-55);
       c.setLineDash([]); c.beginPath(); c.ellipse(target.x, target.y, 25, 15, 0, 0, Math.PI * 2); c.stroke();
       c.beginPath(); c.moveTo(target.x - 35, target.y); c.lineTo(target.x + 35, target.y); c.moveTo(target.x, target.y - 24); c.lineTo(target.x, target.y + 24); c.stroke();
+      c.font = 'bold 15px monospace'; c.lineWidth = 4; c.strokeStyle = '#20382b';
+      c.strokeText(read, target.x, target.y + 42); c.fillText(read, target.x, target.y + 42); c.strokeStyle = color; c.lineWidth = 2;
       if (receiver) {
         c.beginPath(); c.arc(receiver.x, receiver.y, 32, 0, Math.PI * 2); c.stroke();
-        c.fillStyle = '#edff9e'; c.font = 'bold 15px monospace'; c.textAlign = 'center'; c.fillText(`LEAD #${receiver.number}`, receiver.x, receiver.y - 48);
+        c.fillStyle = color; c.font = 'bold 15px monospace'; c.textAlign = 'center'; c.fillText(`LEAD #${receiver.number}`, receiver.x, receiver.y - 48);
       }
     }
     if (play.ball.mode === 'flight') {
@@ -55,11 +61,15 @@ export class PlayRenderer {
     }
     c.restore();
   }
-  drawBall(c, ball) {
+  drawBall(c, ball, lift = 0) {
     c.save(); c.fillStyle = '#14261f88';
+    if (ball.mode === 'loose') {
+      c.save(); c.strokeStyle = '#ffe29e'; c.lineWidth = 3; c.setLineDash([7, 6]);
+      c.beginPath(); c.ellipse(ball.x, ball.y + 5, 23, 13, 0, 0, Math.PI * 2); c.stroke(); c.restore();
+    }
     c.beginPath(); c.ellipse(ball.x, ball.y + 7, 9, 4, 0, 0, Math.PI * 2); c.fill();
-    c.translate(ball.x, ball.y - ball.height);
-    c.rotate(ball.mode === 'flight' ? ball.elapsed * 14 : .4);
+    c.translate(ball.x, ball.y - ball.height - lift);
+    c.rotate(ball.mode === 'flight' ? ball.elapsed * 14 : ball.mode === 'loose' ? ball.elapsed * 9 : .4);
     c.fillStyle = '#a45b32'; c.strokeStyle = '#fff0c8'; c.lineWidth = 1.5;
     c.beginPath(); c.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2); c.fill(); c.stroke();
     c.beginPath(); c.moveTo(-5, 0); c.lineTo(5, 0);

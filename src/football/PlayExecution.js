@@ -65,6 +65,7 @@ export class PlayExecution {
     const p = this.play, scheme = p.call?.blocking;
     if (!scheme || p.elapsed < scheme.release) return;
     p.linemen.forEach((lineman, i) => {
+      if (lineman === p.carrier) return;
       const target = this.point([4 + i * 1.8, scheme.lane + (i - 2) * 2]);
       lineman.update(dt, steer(lineman, target), p.field);
     });

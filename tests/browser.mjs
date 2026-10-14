@@ -39,8 +39,8 @@ try {
   await page.selectOption('#quarter-length', '60'); await page.locator('#screen-action').click(); await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.start(60,false);loop.render()});
   await waitFor(s => s.phase === 'ready'); assert.equal((await snapshot()).spot, 25);
   assert.equal(await page.locator('#down-distance').innerText(), '1ST & 10'); assert.equal(await page.locator('#game-clock').innerText(), '1:00');
-  await page.locator('[data-play="go"]').click();
-  await key('Space'); await page.waitForTimeout(1000);
+  await page.locator('[data-play="outs"]').click();
+  await key('Space'); await page.waitForTimeout(700);
   const receiver = await page.evaluate(async () => { const p = (await import('/src/main.js')).play.receivers[0]; return { x: p.x, y: p.y }; });
   await clickWorld(receiver); await waitFor(s => s.playPhase === 'flight');
   await key('Escape'); const frozen = await snapshot(); await page.waitForTimeout(200);
@@ -70,10 +70,11 @@ try {
 
   for (const [width, height] of [[960, 720], [1920, 1080], [540, 800]]) {
     await fixture(); await page.setViewportSize({ width, height }); await page.waitForTimeout(100);
+    await page.locator('[data-play="outs"]').click();
     const size = await page.locator('#game').evaluate(c => ({ width: c.width, height: c.height, cssWidth: c.clientWidth, cssHeight: c.clientHeight, overflow: document.documentElement.scrollWidth > innerWidth }));
     assert.equal(size.width, size.cssWidth); assert.equal(size.height, size.cssHeight); assert.equal(size.overflow, false);
     await page.screenshot({ path: `test-results/phase3-viewport-${width}.png`, fullPage: true });
-    await key('Space'); await page.waitForTimeout(850);
+    await key('Space'); await page.waitForTimeout(700);
     const target = await page.evaluate(async () => { const p = (await import('/src/main.js')).play.receivers[0]; return { x: p.x, y: p.y }; });
     await clickWorld(target); await waitFor(s => s.playPhase === 'running'); assert.equal((await snapshot()).controlled, '08');
   }

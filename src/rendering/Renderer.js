@@ -1,9 +1,11 @@
 import { PlayRenderer } from './PlayRenderer.js';
+import { PlayEffects } from './PlayEffects.js';
 
 export class Renderer {
   constructor(canvas, camera, field) {
     this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.camera = camera; this.field = field;
     this.playRenderer = new PlayRenderer();
+    this.effects = new PlayEffects();
     if (!this.ctx) throw new Error('A browser with Canvas 2D support is required.');
   }
   resize(width, height) {
@@ -12,16 +14,21 @@ export class Renderer {
     this.canvas.width = Math.round(width * this.dpr); this.canvas.height = Math.round(height * this.dpr);
     this.camera.resize(width, height);
   }
+  updateEffects(dt, play) { this.effects.update(dt, play); }
   render(players, selected, play, aim) {
     const c = this.ctx;
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.imageSmoothingEnabled = false;
     c.fillStyle = '#284e35'; c.fillRect(0, 0, this.camera.width, this.camera.height);
     c.save(); this.camera.apply(c); this.drawField(c);
+    if (play) this.effects.sync(play);
     if (play) this.playRenderer.drawGuides(c, play, aim);
+    this.effects.drawTrails(c);
     for (const player of [...players].sort((a, b) => a.y - b.y)) this.drawPlayer(c, player, player === selected);
-    if (play) this.playRenderer.drawBall(c, play.ball);
+    if (play) this.playRenderer.drawBall(c, play.ball, this.effects.reaction(play.carrier)?.lift || 0);
+    this.effects.drawWorld(c);
     c.restore();
+    this.effects.drawBanner(c, this.camera.width);
   }
   drawField(c) {
     const { width: w, height: h, endZone: end, yard } = this.field;
@@ -61,10 +68,14 @@ export class Renderer {
     c.save(); c.translate(Math.round(p.x), Math.round(p.y));
     c.fillStyle = '#17362066'; c.beginPath(); c.ellipse(3, 14, 20, 9, 0, 0, Math.PI * 2); c.fill();
     if (selected) { c.strokeStyle = '#e0f59a'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(0, 9, 25, 15, 0, 0, Math.PI * 2); c.stroke(); c.fillStyle = '#e6f7a1'; c.beginPath(); c.moveTo(-7, -37); c.lineTo(7, -37); c.lineTo(0, -29); c.fill(); }
+    const reaction = this.effects.reaction(p);
+    if (reaction) { c.translate(0, -reaction.lift); c.rotate(reaction.tilt); }
     const stride = p.moving ? Math.round(Math.sin(p.stride) * 5) : 0;
     c.fillStyle = '#152d2a'; c.fillRect(-10, 7 + stride, 7, 10); c.fillRect(3, 7 - stride, 7, 10);
     c.fillStyle = '#eee7ba'; c.fillRect(-10, 8 + stride, 7, 4); c.fillRect(3, 8 - stride, 7, 4);
-    c.fillStyle = '#ad7850'; c.fillRect(-17, -7 - stride / 2, 6, 12); c.fillRect(11, -7 + stride / 2, 6, 12);
+    c.fillStyle = '#ad7850';
+    if (reaction?.armsUp) { c.fillRect(-19, -25, 6, 18); c.fillRect(13, -25, 6, 18); }
+    else { c.fillRect(-17, -7 - stride / 2, 6, 12); c.fillRect(11, -7 + stride / 2, 6, 12); }
     const uniform = p.uniform || p.team;
     const club = this.teams?.[uniform];
     c.fillStyle = club?.primaryColor || (uniform === 'home' ? '#e3ecbb' : '#d58c62'); c.fillRect(-13, -12, 26, 19);

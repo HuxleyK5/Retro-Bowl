@@ -87,7 +87,8 @@ resize();
 const loop = new GameLoop(dt => {
   if (selecting || !state.playing) return;
   match.update(dt, input.movement);
-  camera.follow(play.ball.mode === 'flight' ? play.ball : play.controlled, dt);
+  renderer.updateEffects(dt, play);
+  camera.follow(['flight', 'loose'].includes(play.ball.mode) ? play.ball : play.controlled, dt);
 }, () => {
   const canHold = input.drag && state.playing && match.humanTurn && match.rules.phase === 'live' && play.phase === 'passing' && play.call?.type !== 'run';
   if (!canHold) input.cancelDrag();
@@ -130,4 +131,4 @@ document.querySelector('#change-club').addEventListener('click', () => {
   document.querySelector('#start-franchise').focus({ preventScroll: true });
 });
 loop.start();
-export { play, camera, state, loop, match, league };
+export { play, camera, state, loop, match, league, renderer };

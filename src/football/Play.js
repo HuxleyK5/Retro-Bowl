@@ -1,12 +1,12 @@
 import { Player } from '../entities/Player.js';
 import { Football } from '../entities/Football.js';
-import { Routes, distance } from './Routes.js';
+import { Routes, distance, steer } from './Routes.js';
 import { Defense } from './Defense.js';
 import { getPlay } from './Playbook.js';
 import { PlayExecution } from './PlayExecution.js';
 import { createRosters } from '../data/Rosters.js';
 import { Blocking } from './Blocking.js';
-import { throwRange, throwVelocity, throwSpread, catchMargin, tackleResult, releaseReaction } from './RatingEffects.js';
+import { throwRange, throwVelocity, throwSpread, catchMargin, tackleResult, releaseReaction, reactionTime, fumbleChance, SPRINT_MULTIPLIER } from './RatingEffects.js';
 
 const still = { x: 0, y: 0, sprint: false };
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -81,17 +81,21 @@ export class Play {
     this.reset();
   }
   get outcome() {
-    return { type: this.result, spot: ((this.carrier?.x ?? this.ball.x) - this.field.endZone) / this.field.yard };
+    return { type: this.result, spot: ((this.carrier?.x ?? this.ball.x) - this.field.endZone) / this.field.yard,
+      recoveredBy: this.recoveredBy, fumbleSpot: this.fumbleSpot };
   }
   reset() {
     this.players.forEach(p => p.reset()); this.routes.reset(); this.ball.reset();
+    this.defense.reset?.();
+    this.events = []; this.eventSerial ??= 0; this.generation = (this.generation || 0) + 1;
+    this.fumbleSpot = undefined; this.recoveredBy = undefined; this.fumbleCount = 0;
     this.execution.reset(); this.isKickoff = false;
     this.blocking.reset(); this.catchJitter = 0; this.autoRunAfterCatch = false; this.catchSteeringReady = false;
     this.carrier = this.qb; this.controlled = this.qb; this.phase = 'presnap'; this.elapsed = 0;
     this.result = ''; this.notice = 'SPACE TO SNAP · Attack the right end zone →'; this.hasThrown = false; this.passDistance = 0; this.catchProtection = 0;
     this.ball.attach(this.qb);
   }
-  get live() { return ['passing', 'flight', 'running'].includes(this.phase); }
+  get live() { return ['passing', 'flight', 'running', 'loose'].includes(this.phase); }
   get canThrow() { return this.phase === 'passing' && this.carrier === this.qb && !this.hasThrown && this.qb.x < this.lineOfScrimmage && this.execution.canPass; }
   snap() {
     if (this.phase !== 'presnap') return false;
@@ -105,7 +109,16 @@ export class Play {
     this.carrier = this.rb; this.controlled = this.rb; this.phase = 'running'; this.ball.attach(this.rb);
     this.notice = 'HANDOFF · Run right! SHIFT sprint · J juke'; return true;
   }
-  juke(direction) { return this.live && !this.execution.locked && this.ball.mode === 'held' && this.carrier.juke(direction); }
+  emit(type, player = this.carrier, label = '') {
+    const point = player || this.ball;
+    this.events.push({ id: ++this.eventSerial, type, x: point.x, y: point.y,
+      number: player?.number, team: player?.team, uniform: player?.uniform || player?.team, label });
+    if (this.events.length > 48) this.events.shift();
+  }
+  juke(direction) {
+    if (!this.live || this.execution.locked || this.ball.mode !== 'held' || !this.carrier.juke(direction)) return false;
+    this.emit('juke'); return true;
+  }
   aim(point) {
     let receiver = null; let nearest = 100;
     for (const p of point.manual ? [] : this.receivers) { const d = distance(p, point); if (d < nearest) { receiver = p; nearest = d; } }
@@ -122,7 +135,17 @@ export class Play {
     const length = distance(this.qb, target);
     const range = throwRange(this.qb.ratings);
     if (length > range) { target = { x: this.qb.x + (target.x - this.qb.x) / length * range, y: this.qb.y + (target.y - this.qb.y) / length * range }; duration = range / throwVelocity(this.qb.ratings); receiver = null; }
-    return { target, duration, receiver };
+    const read = this.passRead(target, duration);
+    return { target, duration, receiver, ...read };
+  }
+  passRead(target, duration) {
+    let separation = Infinity;
+    for (const defender of this.defenders) {
+      const lead = Math.min(.3, duration);
+      const projected = { x: defender.x + defender.vx * lead, y: defender.y + defender.vy * lead };
+      separation = Math.min(separation, distance(projected, target));
+    }
+    return { separation, risk: separation < 45 ? 'danger' : separation < 90 ? 'contested' : 'open' };
   }
   throw(point) {
     if (!this.canThrow || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
@@ -141,32 +164,93 @@ export class Play {
   }
   catchMargin(player, separation) {
     const contested = player.team === 'home' && this.defenders.some(d => distance(d, player) < 65);
-    return catchMargin(player.ratings, separation, contested, this.passDistance, player.team === 'away');
+    const leverage = player.team === 'home' ? this.defenders.reduce((pressure, d) => {
+      const gap = distance(d, player);
+      return Math.max(pressure, gap < 42 && distance(d, this.ball) < separation + 18 ? (42 - gap) / 42 : 0);
+    }, 0) : 0;
+    return catchMargin(player.ratings, separation, contested, this.passDistance, player.team === 'away') - leverage * .16;
   }
-  resolveCatch() {
+  resolveCatch(eligible = [...this.receivers, ...this.defenders]) {
     if (this.ball.x < 0 || this.ball.x > this.field.width || this.ball.y < 0 || this.ball.y > this.field.height) return false;
-    const candidates = [...this.receivers, ...this.defenders]
+    const candidates = eligible
       .map(player => ({ player, separation: distance(player, this.ball) }))
       .filter(({ player, separation }) => separation <= 45 && !this.ball.attempted.has(player) && player.y > player.radius && player.y < this.field.height - player.radius)
       .sort((a, b) => a.separation - b.separation);
     for (const { player, separation } of candidates) {
       this.ball.attempted.add(player);
       if (this.catchMargin(player, separation) + this.catchJitter < 0) continue;
+      const catchHeight = this.ball.height;
       this.carrier = player; this.controlled = player; this.ball.attach(player);
       if (player.team === 'away') this.finish('INTERCEPTION', 'Defense takes possession.');
       else {
         this.phase = 'running'; this.autoRunAfterCatch = true; this.catchSteeringReady = false; this.catchProtection = .25;
         // Commit to the end zone at the catch, rather than braking out of the receiver's route first.
         player.vx = player.speed; player.vy = 0; player.facing = 1; player.moving = true;
+        const contested = this.defenders.some(d => distance(d, player) < 65);
+        this.emit('catch', player, catchHeight > 20 ? 'LEAPING CATCH' : separation > 25 ? 'REACHING CATCH' : contested ? 'CONTESTED CATCH' : 'CATCH');
         this.notice = `CAUGHT BY #${player.number} / AUTO RUN / Release movement keys, then steer / SHIFT sprint / J juke`;
       }
       return true;
     }
     return false;
   }
+  trackPassReceiver(player, dt) {
+    if (this.ball.mode !== 'flight' || this.ball.elapsed < this.ball.duration * .68 ||
+        distance(player, this.ball.target) > 95 + player.ratings.awareness * .55) return false;
+    player.update(dt, { ...steer(player, this.ball.target), route: true }, this.field);
+    return true;
+  }
+  forceFumble(defender) {
+    if (this.ball.mode !== 'held' || !this.carrier || this.fumbleCount >= 2) return false;
+    const runner = this.carrier, gap = Math.max(1, distance(runner, defender));
+    this.fumbleSpot = (runner.x - this.field.endZone) / this.field.yard;
+    this.fumbleCount++; this.recoveredBy = undefined;
+    this.execution.exchanged = true; this.execution.guided = false;
+    this.ball.loosen(runner, { x: runner.vx * .4 + (runner.x - defender.x) / gap * 115,
+      y: runner.vy * .4 + (runner.y - defender.y) / gap * 115 });
+    runner.stunned = .55; defender.stunned = .2;
+    this.emit('fumble', runner, 'BALL LOOSE!');
+    this.carrier = null; this.phase = 'loose'; this.autoRunAfterCatch = false;
+    this.notice = 'FUMBLE / Chase the loose ball / WASD steer'; return true;
+  }
+  updateLooseBall(dt, movement) {
+    const b = this.ball;
+    if (b.y <= 0 || b.y >= this.field.height || b.x <= 0 || b.x >= this.field.width) {
+      this.finish('FUMBLE_OUT_OF_BOUNDS', 'Loose ball out of bounds.'); return;
+    }
+    this.ball.update(dt);
+    if (b.y <= 0 || b.y >= this.field.height || b.x <= 0 || b.x >= this.field.width) {
+      this.finish('FUMBLE_OUT_OF_BOUNDS', 'Loose ball out of bounds.'); return;
+    }
+    for (const player of this.players) {
+      const input = player === this.controlled && (movement.x || movement.y) ? movement : steer(player, b, true);
+      player.update(dt, input, this.field);
+    }
+    if (b.elapsed >= .22) {
+      const recoverer = [...this.players].filter(p => p.stunned <= 0 && distance(p, b) < 20 + p.ratings.awareness * .1)
+        .sort((a, c) => distance(a, b) - distance(c, b))[0];
+      if (recoverer) {
+        this.carrier = this.controlled = recoverer; this.ball.attach(recoverer);
+        this.recoveredBy = recoverer.team === 'away' ? 'defense' : 'offense';
+        this.emit('recovery', recoverer, this.recoveredBy === 'defense' ? 'DEFENSE RECOVERS' : 'OFFENSE RECOVERS');
+        if (this.recoveredBy === 'defense') this.finish('FUMBLE', 'Defense recovers the loose ball.');
+        else {
+          this.phase = 'running'; this.autoRunAfterCatch = true; this.catchSteeringReady = false; this.catchProtection = .4;
+          recoverer.vx = recoverer.speed; recoverer.vy = 0; this.notice = 'RECOVERED / Keep running!';
+        }
+        return;
+      }
+    }
+    if (this.elapsed >= 35 && this.live) this.finish('FUMBLE_OUT_OF_BOUNDS', 'Loose ball whistled dead.');
+  }
   finish(result, detail = '') {
     if (this.phase === 'dead') return;
     this.phase = 'dead'; this.autoRunAfterCatch = false; this.catchSteeringReady = false; this.result = result;
+    const event = { TOUCHDOWN: 'touchdown', INTERCEPTION: 'interception', TACKLED: 'tackle', SACK: 'tackle', SAFETY: 'tackle', INCOMPLETE: 'incomplete' }[result];
+    if (event) this.emit(event, this.carrier, result === 'TACKLED' ? 'TACKLE' : result);
+    if (['INTERCEPTION', 'FUMBLE'].includes(result) && this.carrier?.team === 'away' && this.carrier.x <= this.field.endZone) {
+      this.emit('touchdown', this.carrier, 'DEFENSIVE TOUCHDOWN');
+    }
     const yards = this.carrier ? Math.round((this.carrier.x - this.lineOfScrimmage) / this.field.yard) : 0;
     this.notice = `${detail || `${yards >= 0 ? '+' : ''}${yards} yards on the play.`} SPACE / R for a new play`;
     this.players.forEach(p => { p.moving = false; p.vx = 0; p.vy = 0; });
@@ -175,6 +259,7 @@ export class Play {
     if (!this.live) return;
     this.elapsed += dt;
     this.catchProtection = Math.max(0, this.catchProtection - dt);
+    if (this.phase === 'loose') { this.updateLooseBall(dt, movement); return; }
     movement = this.execution.movement(dt, movement);
     if (this.autoRunAfterCatch && this.phase === 'running') {
       const neutral = !movement.x && !movement.y;
@@ -184,12 +269,19 @@ export class Play {
     }
     if (this.ball.mode === 'held') this.controlled.update(dt, movement, this.field);
     else this.qb.update(dt, still, this.field);
-    for (const p of this.receivers) if (p !== this.carrier && !this.execution.receiverMovement(p, dt)) this.routes.update(p, dt, this.field);
+    for (const p of this.receivers) if (p !== this.carrier && !this.execution.receiverMovement(p, dt) && !this.trackPassReceiver(p, dt)) this.routes.update(p, dt, this.field);
     this.execution.updateBlockers(dt);
     this.defense.update(this, dt);
     if (this.ball.mode === 'flight') {
       this.ball.update(dt);
-      if (this.ball.elapsed / this.ball.duration > .97 && this.ball.height < 16) this.resolveCatch();
+      const progress = this.ball.elapsed / this.ball.duration;
+      if (this.ball.height < 50 && progress > .75) {
+        const ready = this.defenders.filter(d => this.ball.elapsed >= reactionTime(d.ratings) &&
+          distance(d, this.ball) < 18 + d.ratings.coverage * .18 && this.ball.height < 15 + d.ratings.coverage * .35);
+        const receivers = progress > .88 ? this.receivers.filter(p => this.ball.height < 15 + p.ratings.catching * .35) : [];
+        if (ready.length || receivers.length) this.resolveCatch([...receivers, ...ready]);
+      }
+      if (this.ball.mode === 'flight' && this.ball.elapsed / this.ball.duration > .97 && this.ball.height < 16) this.resolveCatch();
       if (this.ball.landed) { this.ball.mode = 'ground'; this.finish('INCOMPLETE', 'The pass falls incomplete.'); }
     }
     if (this.phase === 'dead') return;
@@ -207,11 +299,15 @@ export class Play {
           defender.stunned = .3 + p.ratings.elusiveness * .003; continue;
         }
         if (d < 20 + defender.ratings.tackling * .12 && defender.stunned <= 0 && this.catchProtection <= 0) {
-          const contact = tackleResult(defender.ratings, p.ratings, { momentum: Math.min(1, Math.hypot(p.vx, p.vy) / (p.speed * 1.5)), brokenTackles: p.brokenTackles });
+          const momentum = Math.min(1, Math.hypot(p.vx, p.vy) / (p.speed * SPRINT_MULTIPLIER));
+          const contact = tackleResult(defender.ratings, p.ratings, { momentum, brokenTackles: p.brokenTackles });
           if (contact === 'broken') {
             p.brokenTackles++; defender.stunned = .65; p.vx *= .7; p.vy *= .7;
+            this.emit('brokenTackle', p, 'BROKEN TACKLE');
             this.notice = 'BROKEN TACKLE · Keep moving!'; continue;
           }
+          const sideHit = Math.abs((defender.x - p.x) * p.vy - (defender.y - p.y) * p.vx) > d * p.speed * .5;
+          if (this.random() < fumbleChance(defender.ratings, p.ratings, { momentum, sideHit }) && this.forceFumble(defender)) return;
           this.finish(p.x < this.field.endZone ? 'SAFETY' : p === this.qb && p.x < this.lineOfScrimmage ? 'SACK' : 'TACKLED'); return;
         }
       }

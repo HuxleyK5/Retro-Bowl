@@ -41,13 +41,22 @@ export class KickoffReturn {
     p.notice = 'KICK RETURN / Auto run / WASD steer / SHIFT sprint / J juke';
   }
   finish(rules) {
+    if (rules.phase !== 'return') return false;
     const outcome = this.play.outcome;
-    if (outcome.type === 'TOUCHDOWN' || outcome.type === 'SAFETY') {
-      rules.phase = 'live'; rules.completePlay(outcome); return;
+    const fumbleOut = outcome.type === 'FUMBLE_OUT_OF_BOUNDS';
+    if (outcome.type === 'TOUCHDOWN' || outcome.type === 'SAFETY' || outcome.type === 'FUMBLE' ||
+        (fumbleOut && (outcome.spot <= 0 || outcome.spot >= 100))) {
+      rules.phase = 'live'; return rules.completePlay(outcome);
     }
-    rules.newSeries(outcome.spot); rules.phase = 'result'; rules.clockRunning = false;
+    const spot = fumbleOut && Number.isFinite(outcome.fumbleSpot) ? Math.min(outcome.spot, outcome.fumbleSpot) : outcome.spot;
+    // A sideline fumble from the returner's own end zone also ends in a safety.
+    if (fumbleOut && spot <= 0) {
+      rules.phase = 'live'; return rules.completePlay({ ...outcome, spot });
+    }
+    rules.newSeries(spot); rules.phase = 'result'; rules.clockRunning = false;
     rules.next = null; rules.playClock = 40;
-    rules.result = `KICK RETURN / ${Math.max(0, Math.round(outcome.spot - this.landing))} YARDS`;
-    rules.detail = `${outcome.type === 'OUT OF BOUNDS' ? 'Out of bounds.' : 'Returner down.'} First down at ${rules.spotLabel.toLowerCase()}.`;
+    rules.result = `KICK RETURN / ${Math.max(0, Math.round(spot - this.landing))} YARDS`;
+    rules.detail = `${fumbleOut ? 'Fumble out of bounds.' : outcome.type === 'OUT OF BOUNDS' ? 'Out of bounds.' : 'Returner down.'} First down at ${rules.spotLabel.toLowerCase()}.`;
+    return true;
   }
 }

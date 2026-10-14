@@ -1,5 +1,8 @@
 export const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-export const topSpeed = r => 90 + r.speed;
+export const SPRINT_MULTIPLIER = 1.25;
+export const JUKE_MULTIPLIER = 1.35;
+// Narrow rating differences while preserving each player's relative speed.
+export const topSpeed = r => 120 + .65 * r.speed;
 export const acceleration = r => 340 + 2 * r.speed + 3.2 * r.acceleration;
 export const throwVelocity = r => 400 + 2.5 * r.throwPower;
 export const throwRange = r => 500 + 7 * r.throwPower;
@@ -10,6 +13,12 @@ export const routeTolerance = r => 6 + (99 - r.routeRunning) * .25;
 export const releaseReaction = r => (99 - r.awareness) * .0015;
 export const jukeDuration = r => .12 + .0015 * r.elusiveness + .0005 * r.awareness;
 export const jukeCooldown = r => 2.2 - .006 * r.elusiveness - .003 * r.awareness;
+
+export function fumbleChance(defender, runner, { momentum = 0, sideHit = false } = {}) {
+  const security = .45 * runner.awareness + .3 * runner.strength + .25 * runner.catching;
+  const hit = .6 * defender.tackling + .25 * defender.strength + .15 * defender.awareness;
+  return clamp(.012 + (hit - security) * .001 + momentum * .018 + (sideHit ? .025 : 0), .005, .14);
+}
 
 export function throwSpread(r, distance, moving, pressure) {
   return (1 - r.accuracy / 100) * (12 + distance * .14) +

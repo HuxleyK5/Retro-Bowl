@@ -1,5 +1,5 @@
 import { POSITION_RATINGS, RATING_LABELS } from '../data/PlayerData.js';
-import { topSpeed, acceleration, throwRange, throwVelocity } from '../football/RatingEffects.js';
+import { topSpeed, acceleration, throwRange, throwVelocity, SPRINT_MULTIPLIER } from '../football/RatingEffects.js';
 
 export class RatingsPanel {
   constructor(play, state, focusGame) {
@@ -53,7 +53,7 @@ export class RatingsPanel {
     }
     document.querySelector('#ratings-effect').textContent = data.position === 'QB'
       ? `Arm range ${(throwRange(data.ratings) / 20).toFixed(0)} yd · Ball speed ${(throwVelocity(data.ratings) / 20).toFixed(1)} yd/s`
-      : `Run speed ${(topSpeed(data.ratings) / 20).toFixed(1)} yd/s · Sprint ${(topSpeed(data.ratings) * 1.5 / 20).toFixed(1)} yd/s · Acceleration ${(acceleration(data.ratings) / 20).toFixed(1)} yd/s²`;
+      : `Run speed ${(topSpeed(data.ratings) / 20).toFixed(1)} yd/s · Sprint ${(topSpeed(data.ratings) * SPRINT_MULTIPLIER / 20).toFixed(1)} yd/s · Acceleration ${(acceleration(data.ratings) / 20).toFixed(1)} yd/s²`;
     document.querySelector('#ratings-identity').textContent = `Age ${data.age} / Potential ${data.potential} / ${data.contract.yearsRemaining} years / $${(data.contract.annualSalary/1000000).toFixed(2)}M per year / $${(data.contract.guaranteed/1000000).toFixed(2)}M guaranteed / ID ${data.id}`;
   }
 }

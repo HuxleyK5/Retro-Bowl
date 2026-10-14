@@ -45,7 +45,7 @@ test('JSON round-trip preserves identity and ratings but contains no live simula
 test('rating changes persist through snaps, audibles and possession changes; team records stay separate', () => {
   const p = makePlay(); const homeQB = p.qb.data;
   p.qb.setRatings({accuracy: 97, speed: 95}); p.configure(40, 'home', 50, 'go');
-  assert.equal(p.qb.data, homeQB); assert.equal(p.qb.ratings.accuracy, 97); assert.equal(p.qb.speed, 185);
+  assert.equal(p.qb.data, homeQB); assert.equal(p.qb.ratings.accuracy, 97); assert.equal(p.qb.speed, 181.75);
   p.snap(); p.update(dt); p.reset(); assert.equal(p.qb.ratings.accuracy, 97);
   p.configure(25, 'away'); assert.notEqual(p.qb.data.id, homeQB.id); assert.equal(p.qb.data.teamId, 'away'); assert.equal(p.defenders[0].data.teamId, 'home');
   p.configure(25, 'home'); assert.equal(p.qb.data, homeQB);
@@ -65,6 +65,32 @@ test('speed increases both first-step acceleration and sustained running speed; 
   tick(slow, 2); tick(fast, 2); assert.ok(fast.x > slow.x + 100); assert.ok(fast.speed > slow.speed);
   const sluggish = entity({speed: 80, acceleration: 10}), explosive = entity({speed: 80, acceleration: 99});
   tick(sluggish, .15); tick(explosive, .15); assert.ok(explosive.vx > sluggish.vx + 20); assert.equal(sluggish.speed, explosive.speed);
+});
+
+test('equal speed and acceleration ratings give offense and defense the same movement', () => {
+  const ratings = {speed: 80, acceleration: 85};
+  const receiver = new Player({x: 500, y: 500, data: record('WR', ratings)});
+  const defender = new Player({x: 500, y: 500, role: 'DEFENDER', team: 'away', data: record('DEF', ratings)});
+  assert.equal(defender.speed, receiver.speed); assert.equal(defender.acceleration, receiver.acceleration);
+  for (const sprint of [false, true]) {
+    tick(receiver, .75, {x: Math.SQRT1_2, y: Math.SQRT1_2, sprint});
+    tick(defender, .75, {x: Math.SQRT1_2, y: Math.SQRT1_2, sprint});
+    assert.deepEqual([defender.x, defender.y, defender.vx, defender.vy], [receiver.x, receiver.y, receiver.vx, receiver.vy]);
+  }
+});
+
+test('default coverage defenders keep close to faster receivers without changing saved ratings', () => {
+  const roster = deserializeRosters(serializeRosters(createRosters()));
+  const snapshot = serializeRosters(roster), p = new Play(field, () => .4, roster);
+  const receiver = p.receivers.reduce((fastest, player) => player.speed > fastest.speed ? player : fastest);
+  const coverage = p.defenders.filter(defender => defender.assignment >= 0);
+  assert.ok(coverage.length > 0);
+  for (const defender of coverage) {
+    assert.ok(defender.speed >= receiver.speed * .8, 'coverage can keep at least eighty percent of receiver pace');
+    assert.ok(defender.speed < receiver.speed, 'faster offensive ratings retain a real advantage');
+  }
+  p.snap(); for (let i = 0; i < 120; i++) p.update(dt);
+  assert.equal(serializeRosters(roster), snapshot);
 });
 
 test('throw power changes real throw range and flight duration at identical targets', () => {

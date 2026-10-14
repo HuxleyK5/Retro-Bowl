@@ -92,17 +92,55 @@ export class MatchRules {
 
   }
 
-  completePlay({ type, spot }) {
+  completePlay({ type, spot, fumbleSpot }) {
 
     if (this.phase !== 'live') return false;
 
     const start = this.spot;
 
-    const end = Number.isFinite(spot) ? Math.round(spot * 10) / 10 : start;
+    let end = Number.isFinite(spot) ? Math.round(spot * 10) / 10 : start;
+
+    const fumbleOut = type === 'FUMBLE_OUT_OF_BOUNDS';
 
     this.phase = 'result'; this.next = null; this.result = type; this.detail = '';
 
     this.playClock = 40;
+
+    if (type === 'FUMBLE') {
+
+      if (end <= 0) {
+
+        this.possession = other(this.possession); this.touchdown('FUMBLE / DEFENSIVE TOUCHDOWN');
+
+      } else {
+
+        this.changePossession(end >= 100 ? 20 : 100 - end);
+
+        this.result = end >= 100 ? 'FUMBLE / TOUCHBACK' : 'FUMBLE / DEFENSE RECOVERS';
+        this.detail = `${this.teams[this.possession]} recovers and takes over at ${this.spotLabel.toLowerCase()}${end >= 100 ? ' (touchback)' : ''}.`;
+
+      }
+
+      return true;
+
+    }
+
+    if (fumbleOut) {
+
+      // A loose ball through the opponent's end zone is a touchback, never a touchdown.
+      if (end >= 100) {
+
+        this.changePossession(20); this.result = 'FUMBLE / TOUCHBACK';
+        this.detail = `The loose ball went out through the end zone. ${this.teams[this.possession]} takes over at its own 20.`;
+        return true;
+
+      }
+
+      // On the sideline, the offense cannot gain yards from a forward fumble.
+      if (end > 0 && Number.isFinite(fumbleSpot)) end = Math.round(Math.min(end, fumbleSpot) * 10) / 10;
+      type = 'OUT OF BOUNDS';
+
+    }
 
     if (type === 'INTERCEPTION') {
 
@@ -144,7 +182,7 @@ export class MatchRules {
 
     this.result = incomplete ? 'INCOMPLETE' : gain < 0 ? (type === 'SACK' ? 'SACK' : 'TACKLE FOR LOSS') : gain === 0 ? 'NO GAIN' : `Gain of ${gain} ${unit}`;
 
-    this.detail = incomplete ? 'Pass falls incomplete. The clock stops.' : gain < 0 ? `Loss of ${amount} ${unit}.` : `${type === 'OUT OF BOUNDS' ? 'Out of bounds. Clock stopped.' : 'Runner down in bounds. Clock running.'}`;
+    this.detail = fumbleOut ? 'Fumble out of bounds. Clock stopped.' : incomplete ? 'Pass falls incomplete. The clock stops.' : gain < 0 ? `Loss of ${amount} ${unit}.` : `${type === 'OUT OF BOUNDS' ? 'Out of bounds. Clock stopped.' : 'Runner down in bounds. Clock running.'}`;
 
     if (this.spot >= this.firstDownLine - .001) {
 
@@ -157,6 +195,8 @@ export class MatchRules {
       this.detail = `${this.teams[this.possession]} takes over at ${this.spotLabel.toLowerCase()}.`;
 
     } else this.down++;
+
+    if (fumbleOut && this.result !== 'TURNOVER ON DOWNS') this.result = `FUMBLE OUT OF BOUNDS / ${this.result}`;
 
     return true;
 

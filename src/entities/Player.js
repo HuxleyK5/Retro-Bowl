@@ -1,5 +1,5 @@
 import { PlayerData } from '../data/PlayerData.js';
-import { topSpeed, acceleration, routeAcceleration, jukeDuration, jukeCooldown } from '../football/RatingEffects.js';
+import { topSpeed, acceleration, routeAcceleration, jukeDuration, jukeCooldown, SPRINT_MULTIPLIER, JUKE_MULTIPLIER } from '../football/RatingEffects.js';
 
 export class Player {
   constructor({ number = '00', role = 'RECEIVER', x, y, team = 'home', data, ratings = {} }) {
@@ -29,7 +29,8 @@ export class Player {
     this.jukeTime = Math.max(0, this.jukeTime - dt);
     this.jukeCooldown = Math.max(0, this.jukeCooldown - dt);
     this.stunned = Math.max(0, this.stunned - dt);
-    const speed = this.speed * (movement.sprint ? 1.5 : 1) * (this.jukeTime > 0 ? 1.5 : 1) * (this.stunned > 0 ? .15 : 1);
+    const boost = Math.max(movement.sprint ? SPRINT_MULTIPLIER : 1, this.jukeTime > 0 ? JUKE_MULTIPLIER : 1);
+    const speed = this.speed * boost * (this.stunned > 0 ? .15 : 1);
     const dx = movement.x * speed - this.vx;
     const dy = movement.y * speed - this.vy;
     const distance = Math.hypot(dx, dy);
@@ -48,8 +49,8 @@ export class Player {
     this.jukeTime = jukeDuration(this.ratings);
     this.jukeCooldown = jukeCooldown(this.ratings);
     const length = Math.hypot(direction.x, direction.y);
-    this.vx = (length ? direction.x / length : 0) * this.speed * 2;
-    this.vy = (length ? direction.y / length : -1) * this.speed * 2;
+    this.vx = (length ? direction.x / length : 0) * this.speed * JUKE_MULTIPLIER;
+    this.vy = (length ? direction.y / length : -1) * this.speed * JUKE_MULTIPLIER;
     return true;
   }
   reset() {

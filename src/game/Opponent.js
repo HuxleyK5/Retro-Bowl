@@ -18,12 +18,20 @@ export class Opponent {
   }
   movement(play) {
     if (play.phase === 'passing' && play.canThrow && !this.decision && play.elapsed > 1.25 - play.qb.ratings.awareness * .006) {
-      this.decision = !play.call && this.random() < .2 ? 'run' : 'pass';
-      if (this.decision === 'run') play.handoff();
+      const decision = !play.call && this.random() < .2 ? 'run' : 'pass';
+      if (decision === 'run') { this.decision = decision; play.handoff(); }
       else {
         const reads = Math.max(1, Math.ceil(play.qb.ratings.awareness / 20));
-        const targets = play.receivers.slice(0, reads).map(p => ({ p, space: Math.min(...play.defenders.map(d => distance(d, p))) })).sort((a, b) => b.space - a.space);
-        play.throw(targets[0].p);
+        const targets = play.receivers.slice(0, reads).map(p => {
+          const space = Math.min(...play.defenders.map(d => distance(d, p)));
+          const plan = play.aim(p);
+          return { p, plan, score: space * .4 + Math.min(180, plan.separation) * .6 };
+        }).sort((a, b) => b.score - a.score);
+        const pressure = play.defenders.some(d => distance(d, play.qb) < 105);
+        // Give a covered route time to break open, but release under pressure.
+        if (targets[0] && (targets[0].plan.risk !== 'danger' || pressure || play.elapsed > 2.4)) {
+          this.decision = decision; play.throw(targets[0].p);
+        }
       }
     }
     if (play.phase !== 'running' && this.decision !== 'run') return { x: 0, y: 0 };
