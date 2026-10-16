@@ -1,11 +1,21 @@
 import { PlayRenderer } from './PlayRenderer.js';
 import { PlayEffects } from './PlayEffects.js';
+import { Stadium } from './Stadium.js';
+
+const textColor = hex => {
+  const color = (hex || '#345846').replace('#', '');
+  const rgb = color.length === 3 ? color.split('').map(n => n + n).join('') : color;
+  const value = parseInt(rgb, 16);
+  return ((value >> 16) * .299 + ((value >> 8) & 255) * .587 + (value & 255) * .114) > 155 ? '#10251f' : '#ffffff';
+};
 
 export class Renderer {
   constructor(canvas, camera, field) {
     this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.camera = camera; this.field = field;
     this.playRenderer = new PlayRenderer();
     this.effects = new PlayEffects();
+    this.stadium = new Stadium(field);
+    this.lastResult = '';
     if (!this.ctx) throw new Error('A browser with Canvas 2D support is required.');
   }
   resize(width, height) {
@@ -14,75 +24,136 @@ export class Renderer {
     this.canvas.width = Math.round(width * this.dpr); this.canvas.height = Math.round(height * this.dpr);
     this.camera.resize(width, height);
   }
-  updateEffects(dt, play) { this.effects.update(dt, play); }
+  resetPresentation() {
+    this.effects = new PlayEffects(); this.stadium.reset(); this.lastResult = '';
+  }
+  updateEffects(dt, play, rules) {
+    // Rules resolve fourth downs and end-zone fumbles after the play emits its events.
+    if (rules) {
+      const result = `${play.generation}:${rules.playNumber}:${rules.result}`;
+      if (result !== this.lastResult) {
+        this.lastResult = result;
+        if (rules.result === 'TURNOVER ON DOWNS' || rules.result === 'FUMBLE / TOUCHBACK') {
+          const point = play.carrier || play.ball;
+          play.emit('turnover', { x: point.x, y: point.y, team: 'away', uniform: rules.possession }, rules.result);
+        }
+      }
+    }
+    this.effects.update(dt, play);
+    this.stadium.update(dt, play, rules);
+  }
   render(players, selected, play, aim) {
     const c = this.ctx;
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.imageSmoothingEnabled = false;
-    c.fillStyle = '#284e35'; c.fillRect(0, 0, this.camera.width, this.camera.height);
-    c.save(); this.camera.apply(c); this.drawField(c);
+    c.fillStyle = '#1a302b'; c.fillRect(0, 0, this.camera.width, this.camera.height);
     if (play) this.effects.sync(play);
+    c.save(); this.camera.apply(c);
+    this.stadium.drawWorld(c, this.teams, this.effects);
+    this.drawField(c);
     if (play) this.playRenderer.drawGuides(c, play, aim);
     this.effects.drawTrails(c);
-    for (const player of [...players].sort((a, b) => a.y - b.y)) this.drawPlayer(c, player, player === selected);
+    const primarySlot = play?.previewSlot || (play?.call?.type === 'run' ? '22' : '81');
+    for (const player of [...players].sort((a, b) => a.y - b.y)) this.drawPlayer(c, player, player === selected, player === play?.carrier,
+      play?.phase === 'presnap' && player.team === 'home' && player.slot === primarySlot);
     if (play) this.playRenderer.drawBall(c, play.ball, this.effects.reaction(play.carrier)?.lift || 0);
     this.effects.drawWorld(c);
     c.restore();
-    this.effects.drawBanner(c, this.camera.width);
+    this.stadium.drawLighting(c, this.camera.width, this.camera.height);
+    this.stadium.drawWeather(c, this.camera.width, this.camera.height);
+    this.effects.drawScreen(c, this.camera.width, this.camera.height);
+    this.effects.drawBanner(c, this.camera.width, this.camera.height);
   }
   drawField(c) {
     const { width: w, height: h, endZone: end, yard } = this.field;
-    c.fillStyle = '#8b9d68'; c.fillRect(-14, -14, w + 28, h + 28);
-    c.fillStyle = '#426d42'; c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 20; i++) { c.fillStyle = i % 2 ? '#477545' : '#416d40'; c.fillRect(end + i * yard * 5, 0, yard * 5, h); }
-    c.fillStyle = '#284f39'; c.fillRect(0, 0, end, h); c.fillRect(w - end, 0, end, h);
-    c.fillStyle = '#a5bb8066';
-    for (let x = 13; x < w; x += 31) for (let y = 17; y < h; y += 37) c.fillRect(x, y, 2, 2);
-    c.strokeStyle = '#dce6bfbb'; c.lineWidth = 3;
+    c.fillStyle = '#e9eed9'; c.fillRect(-10, -10, w + 20, h + 20);
+    c.fillStyle = '#2d6b43'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 20; i++) { c.fillStyle = i % 2 ? '#33764a' : '#2d6b43'; c.fillRect(end + i * yard * 5, 0, yard * 5, h); }
+    c.fillStyle = this.teams?.home.primaryColor || '#214f43'; c.fillRect(0, 0, end, h);
+    c.fillStyle = this.teams?.away.primaryColor || '#304c61'; c.fillRect(w - end, 0, end, h);
+    c.fillStyle = '#10251f35'; c.fillRect(0, 0, end, h); c.fillRect(w - end, 0, end, h);
+    // Restrained grain keeps the turf alive without competing with players,
+    // route stems and one-yard hashes at the broadcast camera's smaller scale.
+    c.fillStyle = '#d6e5aa12';
+    for (let x = 23; x < w; x += 73) for (let y = 31; y < h; y += 79) c.fillRect(x, y, 2, 1);
+    c.strokeStyle = '#fff8dc'; c.lineWidth = 5;
     c.strokeRect(0, 0, w, h);
     for (let i = 0; i <= 100; i += 5) {
       const x = end + i * yard;
+      c.lineWidth = i % 10 === 0 ? 4.5 : 2.5;
+      c.strokeStyle = i % 10 === 0 ? '#fff9e9' : '#f5f2d4c9';
       c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke();
     }
-    c.lineWidth = 2;
+    c.lineWidth = 3; c.strokeStyle = '#fff8e3ed';
     for (let i = 1; i < 100; i++) {
       const x = end + i * yard;
       for (const y of [24, h * .42, h * .58, h - 24]) { c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x, y + 7); c.stroke(); }
     }
-    c.fillStyle = '#e0e8c5b3'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 49px monospace';
+    c.fillStyle = '#fff9e9'; c.strokeStyle = '#15472e'; c.lineWidth = 3;
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 54px monospace';
     for (let i = 10; i < 100; i += 10) {
       const x = end + i * yard;
-      c.fillText(String(Math.min(i, 100 - i)), x, h - 135);
-      c.save(); c.translate(x, 135); c.rotate(Math.PI); c.fillText(String(Math.min(i, 100 - i)), 0, 0); c.restore();
+      const number = String(Math.min(i, 100 - i));
+      c.strokeText(number, x, h - 135); c.fillText(number, x, h - 135);
+      c.save(); c.translate(x, 135); c.rotate(Math.PI); c.strokeText(number, 0, 0); c.fillText(number, 0, 0); c.restore();
+      if (i !== 50) for (const y of [135, h - 135]) {
+        const direction = i < 50 ? -1 : 1;
+        c.beginPath(); c.moveTo(x + direction * 43, y - 8); c.lineTo(x + direction * 55, y); c.lineTo(x + direction * 43, y + 8); c.fill();
+      }
     }
     for (const x of [end / 2, w - end / 2]) {
-      c.save(); c.translate(x, h / 2); c.rotate(-Math.PI / 2); c.font = 'bold 64px monospace'; c.fillStyle = '#a9c49355'; c.fillText(this.teams?.home.name.toUpperCase() || 'POCKET FIELD', 0, 0, h - 100); c.restore();
+      const club = this.teams?.[x < w / 2 ? 'home' : 'away'];
+      c.save(); c.translate(x, h / 2); c.rotate(-Math.PI / 2); c.font = 'bold 76px monospace'; c.fillStyle = '#ffffffd9'; c.fillText(club?.name.toUpperCase() || 'POCKET FIELD', 0, 0, h - 140); c.restore();
     }
-    c.save(); c.translate(w / 2, h / 2); c.rotate(-Math.PI / 8); c.fillStyle = '#b5ce8d24'; c.fillRect(-90, -90, 180, 180); c.rotate(Math.PI / 8); c.font = 'bold 88px monospace'; c.fillStyle = '#c1d69a44'; c.fillText(this.teams?.home.abbreviation || 'PF', 0, 5); c.restore();
+    c.save(); c.translate(w / 2, h / 2); c.rotate(-Math.PI / 8); c.fillStyle = '#b5ce8d13'; c.fillRect(-90, -90, 180, 180); c.rotate(Math.PI / 8); c.font = 'bold 88px monospace'; c.fillStyle = '#d9e6b32b'; c.fillText(this.teams?.home.abbreviation || 'PF', 0, 5); c.restore();
     c.fillStyle = '#bdcc92';
     for (const x of [0, end, w - end, w]) for (const y of [-4, h - 4]) { c.fillStyle = '#efae63'; c.fillRect(x - 4, y, 8, 8); }
-    c.fillStyle = '#b4c19b66';
-    for (let x = end; x <= w - end; x += 200) { c.fillRect(x - 26, -58, 52, 8); c.fillRect(x - 26, h + 50, 52, 8); }
   }
-  drawPlayer(c, p, selected) {
+  drawPlayer(c, p, selected, carrier = false, primary = false) {
     c.save(); c.translate(Math.round(p.x), Math.round(p.y));
-    c.fillStyle = '#17362066'; c.beginPath(); c.ellipse(3, 14, 20, 9, 0, 0, Math.PI * 2); c.fill();
-    if (selected) { c.strokeStyle = '#e0f59a'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(0, 9, 25, 15, 0, 0, Math.PI * 2); c.stroke(); c.fillStyle = '#e6f7a1'; c.beginPath(); c.moveTo(-7, -37); c.lineTo(7, -37); c.lineTo(0, -29); c.fill(); }
+    const scale = Math.min(1.75, Math.max(1, .62 / this.camera.zoom));
+    c.scale(scale, scale);
+    c.fillStyle = '#0c211c80'; c.beginPath(); c.ellipse(5, 15, 21, 8, 0, 0, Math.PI * 2); c.fill();
+    if (selected || carrier) {
+      c.fillStyle = selected ? '#dcff7b26' : '#ffd47724';
+      c.beginPath(); c.ellipse(0, 10, 28, 17, 0, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#10261f'; c.lineWidth = 7; c.stroke();
+      c.strokeStyle = selected ? '#e6ff94' : '#ffd477'; c.lineWidth = 3.5; c.stroke();
+    }
+    if (selected) { c.fillStyle = '#e6ff94'; c.strokeStyle = '#10261f'; c.lineWidth = 3; c.beginPath(); c.moveTo(-8, -43); c.lineTo(8, -43); c.lineTo(0, -33); c.stroke(); c.fill(); }
     const reaction = this.effects.reaction(p);
     if (reaction) { c.translate(0, -reaction.lift); c.rotate(reaction.tilt); }
     const stride = p.moving ? Math.round(Math.sin(p.stride) * 5) : 0;
-    c.fillStyle = '#152d2a'; c.fillRect(-10, 7 + stride, 7, 10); c.fillRect(3, 7 - stride, 7, 10);
+    c.fillStyle = '#10231f'; c.fillRect(-10, 7 + stride, 7, 10); c.fillRect(3, 7 - stride, 7, 10);
     c.fillStyle = '#eee7ba'; c.fillRect(-10, 8 + stride, 7, 4); c.fillRect(3, 8 - stride, 7, 4);
     c.fillStyle = '#ad7850';
     if (reaction?.armsUp) { c.fillRect(-19, -25, 6, 18); c.fillRect(13, -25, 6, 18); }
     else { c.fillRect(-17, -7 - stride / 2, 6, 12); c.fillRect(11, -7 + stride / 2, 6, 12); }
     const uniform = p.uniform || p.team;
     const club = this.teams?.[uniform];
-    c.fillStyle = club?.primaryColor || (uniform === 'home' ? '#e3ecbb' : '#d58c62'); c.fillRect(-13, -12, 26, 19);
-    c.fillStyle = club?.secondaryColor || '#e3ecbb'; c.fillRect(-13, -11, 4, 7); c.fillRect(9, -11, 4, 7);
-    c.font = 'bold 10px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = club ? '#ffffff' : '#283d2e'; c.fillText(p.number, 0, 0);
-    c.fillStyle = '#172f29'; c.fillRect(-10, -26, 20, 15); c.fillStyle = '#dfe9b8'; c.fillRect(-9, -25, 18, 12); c.fillStyle = '#6c8755'; c.fillRect(-2, -25, 4, 12); c.fillStyle = '#263f32'; c.fillRect(p.facing > 0 ? 5 : -10, -17, 6, 5);
+    const jersey = uniform === 'away' ? '#f2f2e5' : club?.primaryColor || '#2e6160';
+    const trim = uniform === 'away' ? club?.primaryColor || '#304c61' : club?.secondaryColor || '#f5d18a';
+    // A light outline and white away shirts keep even similar club palettes distinct.
+    c.fillStyle = '#071b17'; c.fillRect(-16, -15, 32, 25);
+    c.strokeStyle = '#fff9df'; c.lineWidth = 2; c.strokeRect(-16, -15, 32, 25);
+    c.fillStyle = jersey; c.fillRect(-13, -12, 26, 19);
+    c.fillStyle = trim; c.fillRect(-13, -11, 4, 7); c.fillRect(9, -11, 4, 7);
+    c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = textColor(jersey); c.fillText(p.number, 0, 0);
+    c.fillStyle = '#10221e'; c.fillRect(-11, -28, 22, 17);
+    c.fillStyle = club?.primaryColor || '#dfe9b8'; c.fillRect(-9, -26, 18, 12);
+    c.fillStyle = club?.secondaryColor || '#f2f3e0'; c.fillRect(-2, -26, 4, 12);
+    c.strokeStyle = '#fff9df'; c.lineWidth = 2; c.strokeRect(-10, -27, 20, 14);
+    c.fillStyle = '#10221e'; c.fillRect(p.facing > 0 ? 5 : -11, -18, 7, 6);
     if (p.jukeTime > 0) { c.strokeStyle = '#edff9e'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 34, -.7, 1.5); c.stroke(); }
     c.restore();
+    if (selected || (p.team === 'home' && p.role !== 'LINEMAN')) {
+      c.save(); c.translate(p.x, p.y - 52 * scale); c.scale(1 / this.camera.zoom, 1 / this.camera.zoom);
+      const label = selected ? `YOU #${p.number}` : primary ? `READ #${p.number}` : p.role === 'QUARTERBACK' ? `QB #${p.number}` : `#${p.number}`;
+      c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      const width = c.measureText(label).width + 10;
+      c.fillStyle = selected ? '#e6ff94' : '#10251f'; c.fillRect(-width / 2, -8.5, width, 17);
+      c.strokeStyle = selected ? '#10251f' : primary ? '#e6ff94' : '#e8efd47a'; c.lineWidth = 1; c.strokeRect(-width / 2, -8.5, width, 17);
+      c.fillStyle = selected ? '#10251f' : primary ? '#e6ff94' : '#fff8df'; c.fillText(label, 0, .5); c.restore();
+    }
   }
 }

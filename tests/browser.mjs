@@ -29,16 +29,19 @@ try {
     await page.evaluate(async f => {
       const { match, state } = await import('/src/main.js'); state.set('playing'); match.start(60, false);
       Object.assign(match.rules, { down: f.down, quarter: f.quarter, clock: f.clock, playClock: f.playClock });
-      match.rules.newSeries(f.spot); match.rules.down = f.down; match.prepare(); match.selectPlay('go');
+      match.rules.newSeries(f.spot); match.rules.down = f.down; match.prepare();
+      match.cpuAdjustment = 'cushion'; match.selectPlay('go');
     }, { spot, down, quarter, clock, playClock });
     await page.locator('#game').focus(); await page.waitForTimeout(80);
   };
 
   assert.equal((await snapshot()).phase, 'pregame');
   await page.screenshot({ path: 'test-results/phase3-start.png', fullPage: true });
-  await page.selectOption('#quarter-length', '60'); await page.locator('#screen-action').click(); await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.start(60,false);loop.render()});
+  await page.selectOption('#quarter-length', '60'); await page.locator('#screen-action').click(); await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.start(60,false);match.cpuAdjustment='cushion';match.selectPlay('slants');loop.render()});
   await waitFor(s => s.phase === 'ready'); assert.equal((await snapshot()).spot, 25);
   assert.equal(await page.locator('#down-distance').innerText(), '1ST & 10'); assert.equal(await page.locator('#game-clock').innerText(), '1:00');
+  // Exercise a touchdown from the red zone against a cushion look; coverage now contains long runouts.
+  await page.evaluate(async () => { const { match, loop } = await import('/src/main.js'); match.rules.newSeries(85); match.prepare(); match.cpuAdjustment = 'cushion'; match.selectPlay('outs'); loop.render(); });
   await page.locator('[data-play="outs"]').click();
   await key('Space'); await page.waitForTimeout(700);
   const receiver = await page.evaluate(async () => { const p = (await import('/src/main.js')).play.receivers[0]; return { x: p.x, y: p.y }; });
@@ -61,8 +64,11 @@ try {
   // Isolated UI fixtures check actions and scoreboard, while full-match test below uses natural outcomes.
   await fixture({ spot: 75, down: 4 }); await key('f'); await lockMeter(page); await waitFor(s => s.phase === 'result');
   assert.equal((await snapshot()).result, 'FIELD GOAL GOOD'); assert.equal((await snapshot()).score.home, 3); assert.equal((await snapshot()).possession, 'away');
-  await fixture({ spot: 25, down: 4 }); await page.locator('#punt').click(); await lockMeter(page); await waitFor(s => s.phase === 'result');
-  assert.match((await snapshot()).result, /^PUNT/); assert.equal((await snapshot()).possession, 'away'); assert.ok((await snapshot()).spot >= 15 && (await snapshot()).spot <= 20);
+  await fixture({ spot: 25, down: 4 }); await page.locator('#punt').click(); await lockMeter(page);
+  const puntLanding = await page.evaluate(async () => (await import('/src/main.js')).match.rules.kick.landing);
+  await waitFor(s => s.phase === 'result');
+  assert.match((await snapshot()).result, /^PUNT/); assert.equal((await snapshot()).possession, 'away');
+  assert.equal((await snapshot()).spot, puntLanding >= 100 ? 20 : 100 - puntLanding);
   await fixture({ playClock: .15 }); await waitFor(s => s.result === 'DELAY OF GAME'); assert.equal((await snapshot()).spot, 20); assert.equal((await snapshot()).down, 1);
   await fixture(); await key('Space'); const beforeReset = await snapshot(); await key('r'); assert.equal((await snapshot()).phase, 'live'); assert.ok((await snapshot()).clock <= beforeReset.clock);
   await page.locator('#pause').click(); assert.equal((await snapshot()).paused, true); await page.locator('#resume').click();
@@ -111,6 +117,8 @@ try {
   assert.ok(seen.has('quarterBreak')); assert.ok(seen.has('halftime')); assert.ok(seen.has('final'));
   const final = await snapshot(); await key('f'); await key('k'); assert.deepEqual((await snapshot()).score, final.score);
   await page.locator('#screen-action').click();
+  assert.equal(await page.locator('#franchise-screen').isVisible(), true);
+  await page.locator('[data-focus="play-game"]').click();
   await page.evaluate(async () => { const {loop} = await import('/src/main.js'); loop.start(); });
   await waitFor(s => s.phase === 'pregame'); assert.deepEqual((await snapshot()).score, {home: 0, away: 0});
   await page.locator('#screen-action').click(); await waitFor(s => s.phase === 'kickoff');

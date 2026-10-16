@@ -22,7 +22,7 @@ try {
     assert.fail(JSON.stringify(await read()));
   };
   const prepare = async () => {
-    await page.evaluate(async () => { const {match,state,play} = await import('/src/main.js'); state.set('playing'); match.start(120, false); play.random = () => .4; });
+    await page.evaluate(async () => { const {match,state,play} = await import('/src/main.js'); state.set('playing'); match.start(120, false); match.cpuAdjustment = 'cushion'; match.selectPlay('slants'); play.random = () => .4; });
     await page.locator('#game').focus(); await page.waitForTimeout(80);
   };
   assert.equal(await page.locator('[data-play]').count(), 12);

@@ -2,10 +2,13 @@ export class PlayRenderer {
   drawGuides(c, play, aim) {
     c.save();
     if (!play.isKickoff) {
-    c.strokeStyle = '#a6ddedaa'; c.lineWidth = 3;
+    c.strokeStyle = '#102c28bd'; c.lineWidth = 8;
     c.beginPath(); c.moveTo(play.lineOfScrimmage, 0); c.lineTo(play.lineOfScrimmage, play.field.height); c.stroke();
+    c.strokeStyle = '#7ae5ff'; c.lineWidth = 4; c.stroke();
     if (play.firstDownX) {
-      c.strokeStyle = '#f3ce6cbb'; c.beginPath(); c.moveTo(play.firstDownX, 0); c.lineTo(play.firstDownX, play.field.height); c.stroke();
+      c.strokeStyle = '#4a3819b8'; c.lineWidth = 8;
+      c.beginPath(); c.moveTo(play.firstDownX, 0); c.lineTo(play.firstDownX, play.field.height); c.stroke();
+      c.strokeStyle = '#ffe18a'; c.lineWidth = 4; c.stroke();
     }
     }
     c.strokeStyle = '#f4d37d'; c.lineWidth = 5;
@@ -14,16 +17,29 @@ export class PlayRenderer {
       c.beginPath(); c.moveTo(x, y + 60); c.lineTo(x, y - 60); c.moveTo(x - 25, y - 60); c.lineTo(x + 25, y - 60); c.moveTo(x - 25, y - 60); c.lineTo(x - 25, y - 110); c.moveTo(x + 25, y - 60); c.lineTo(x + 25, y - 110); c.stroke();
     }
     if (play.phase === 'presnap') {
-      c.setLineDash([12, 12]); c.lineWidth = 3; c.strokeStyle = '#edf4b68c';
-      for (const receiver of play.receivers) {
-        c.strokeStyle = receiver === play.rb ? '#f6ca70cc' : play.call?.type === 'run' ? '#a7b89a77' : '#edf4b68c';
-        c.beginPath(); c.moveTo(receiver.x, receiver.y);
-        receiver.route.forEach(p => c.lineTo(p.x, p.y)); c.stroke();
-        const end = receiver.route.at(-1);
-        const prev = receiver.route.length > 1 ? receiver.route.at(-2) : receiver;
+      const primarySlot = play.previewSlot || (play.call?.type === 'run' ? '22' : '81');
+      const ordered = [...play.receivers].sort((a, b) => Number(a.slot === primarySlot) - Number(b.slot === primarySlot));
+      for (const receiver of ordered) {
+        const primary = receiver.slot === primarySlot;
+        const motion = play.execution?.motion;
+        const dx = motion?.player === receiver ? receiver.x - motion.origin.x : 0;
+        const dy = motion?.player === receiver ? receiver.y - motion.origin.y : 0;
+        const route = (receiver.route || []).map(point => ({
+          x: Math.max(20, Math.min(play.field.width - 25, point.x + dx)),
+          y: Math.max(30, Math.min(play.field.height - 30, point.y + dy)),
+        }));
+        if (!route.length) continue;
+        const color = primary ? '#e6ff94' : receiver === play.rb ? '#f5d38cba' : play.call?.type === 'run' ? '#ced9bc82' : '#fff4d5b8';
+        c.setLineDash(primary ? [] : [13, 12]);
+        c.lineWidth = primary ? 9 : 6; c.strokeStyle = primary ? '#123a27df' : '#123a2773';
+        c.beginPath(); c.moveTo(receiver.x, receiver.y); route.forEach(point => c.lineTo(point.x, point.y)); c.stroke();
+        c.lineWidth = primary ? 4.5 : 2.5; c.strokeStyle = color; c.stroke();
+        const end = route.at(-1);
+        const prev = route.length > 1 ? route.at(-2) : receiver;
         c.save(); c.setLineDash([]); c.translate(end.x, end.y); c.rotate(Math.atan2(end.y - prev.y, end.x - prev.x));
         c.beginPath(); c.moveTo(-14, -9); c.lineTo(0, 0); c.lineTo(-14, 9); c.stroke(); c.restore();
       }
+      c.setLineDash([]);
     }
     if (play.call?.type === 'run' && play.live && play.execution.guided) {
       c.strokeStyle = '#f6ca7088'; c.lineWidth = 3; c.setLineDash([10, 12]); c.beginPath(); c.moveTo(play.rb.x, play.rb.y);

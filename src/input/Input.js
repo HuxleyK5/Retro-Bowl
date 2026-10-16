@@ -9,7 +9,7 @@ export class Input {
       if (movementKeys.has(event.code) && focused) {
         event.preventDefault(); this.keys.add(event.code);
       }
-      const action = { Escape: 'pause', KeyP: 'pause', Space: 'snap', KeyR: 'reset', KeyH: 'handoff', KeyJ: 'juke', KeyF: 'fieldGoal', KeyK: 'punt', KeyQ: 'audiblePrevious', KeyE: 'audibleNext' }[event.code];
+      const action = { Escape: 'pause', KeyP: 'pause', Space: 'snap', KeyR: 'reset', KeyH: 'handoff', KeyJ: 'juke', KeyF: 'fieldGoal', KeyK: 'punt', KeyQ: 'audiblePrevious', KeyE: 'audibleNext', Digit0: 'throwAuto', Digit1: 'throwShort', Digit2: 'throwMedium', Digit3: 'throwDeep', KeyM: 'motionNext', KeyT: 'timeout' }[event.code];
       if (action && (focused || action === 'pause')) {
         event.preventDefault();
         if (!event.repeat) onAction(action);

@@ -1,10 +1,12 @@
 import { kickExecution } from './KickMeter.js';
+import { effectiveRatings } from '../data/PlayerLifecycle.js';
 
 export class KickoffReturn {
   constructor(play) { this.play = play; }
   launch(rules, input) {
     const p = this.play, kickingSide = rules.possession === 'home' ? 'away' : 'home';
-    const rating = rules.specialists?.[kickingSide]?.kicker?.ratings;
+    const kicker = rules.specialists?.[kickingSide]?.kicker;
+    const rating = kicker ? effectiveRatings(kicker) : undefined;
     const kick = kickExecution('kickoff', rating, 0, input);
     this.landing = Math.round(65 - kick.kickoffYards);
     this.touchback = this.landing <= 0;

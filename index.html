@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#111b1b">
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="franchise.css">
+  <link rel="stylesheet" href="strategy.css">
   <title>Pocket Field · Match Day</title>
 </head>
 <body>
@@ -21,18 +23,33 @@
       <div id="team-grid" class="team-grid" aria-label="Choose a franchise team"></div>
       <div class="club-detail"><h3 id="selected-club"></h3><p id="club-details"></p><p id="club-summary"></p>
         <button id="start-franchise" type="button">START FRANCHISE</button> <button id="continue-franchise" type="button" hidden>CONTINUE SAVED CLUB</button>
-        <p id="save-status" role="status">Saves your club and league rosters in this browser. Starting a new franchise replaces that snapshot. Game progress is not saved yet.</p>
+        <p id="save-status" role="status">Build your roster, play a 12-week season, and chase the championship. Seasons and roster moves autosave in this browser. Unfinished games restart at kickoff. Starting a new franchise replaces your save.</p>
         <details><summary>EXPLORE ALL 53 PLAYERS</summary><div class="roster-scroll"><table class="club-table"><thead><tr><th>PLAYER</th><th>POS</th><th>AGE</th><th>OVR</th><th>POT</th><th>CONTRACT / YEAR</th><th>GUARANTEED</th></tr></thead><tbody id="club-roster"></tbody></table></div></details>
       </div>
     </section>
+    <section id="franchise-screen" class="franchise-screen" aria-label="Franchise management" hidden></section>
     <section hidden class="game-shell" aria-label="Football game">
       <div class="scoreboard match-scoreboard">
-        <div class="score-team" id="home-team"><span class="team-icon">N</span><div><span id="home-name">HOME</span><small>HOME / YOU</small></div><strong id="home-score">0</strong></div>
-        <div class="score-time"><span id="quarter">Q1</span><strong id="game-clock">2:00</strong><small>PLAY <b id="play-clock">40</b></small></div>
-        <div class="score-team visitor" id="away-team"><strong id="away-score">0</strong><div><span id="away-name">AWAY</span><small>AWAY / CPU</small></div><span class="team-icon">E</span></div>
-        <button id="pause" type="button">Ⅱ <span>PAUSE</span><kbd>ESC</kbd></button>
+        <div class="scoreboard-tools"><span class="scoreboard-caption">MATCH CENTRE <i></i> REGULATION</span><button id="pause" type="button">Ⅱ <span>PAUSE</span><kbd>ESC</kbd></button></div>
+        <div class="score-team" id="home-team">
+          <span class="team-icon">N</span><div class="score-identity"><small>HOME / YOU</small><span id="home-name">HOME</span><div class="team-timeouts" id="home-timeout-status" aria-label="3 timeouts remaining"><span class="timeout-dots" aria-hidden="true"><i class="timeout-dot available"></i><i class="timeout-dot available"></i><i class="timeout-dot available"></i></span><span aria-hidden="true"><b id="home-timeouts">3</b> TO</span></div></div>
+          <div class="score-value"><strong id="home-score">0</strong><span class="score-change" id="home-score-change" aria-hidden="true"></span></div>
+        </div>
+        <div class="score-time"><span id="quarter">Q1</span><small class="play-clock-label">PLAY <b id="play-clock">40</b></small><strong id="game-clock">2:00</strong><span class="clock-caption">GAME CLOCK</span><span id="clock-event" class="clock-event" aria-hidden="true"></span></div>
+        <div class="score-team visitor" id="away-team">
+          <div class="score-value"><strong id="away-score">0</strong><span class="score-change" id="away-score-change" aria-hidden="true"></span></div>
+          <div class="score-identity"><small>AWAY / CPU</small><span id="away-name">AWAY</span><div class="team-timeouts" id="away-timeout-status" aria-label="3 timeouts remaining"><span aria-hidden="true"><b id="away-timeouts">3</b> TO</span><span class="timeout-dots" aria-hidden="true"><i class="timeout-dot available"></i><i class="timeout-dot available"></i><i class="timeout-dot available"></i></span></div></div><span class="team-icon">E</span>
+        </div>
       </div>
-      <div class="drive-bar"><span id="possession">NORTHSIDE BALL →</span><strong id="down-distance">1ST & 10</strong><span id="ball-spot">OWN 25</span><span class="line-legend">BLUE: SCRIMMAGE <i></i> GOLD: FIRST DOWN</span></div>
+      <div class="drive-bar"><div class="drive-down"><small>DOWN & DISTANCE</small><strong id="down-distance">1ST & 10</strong></div><div class="drive-position"><small>FIELD POSITION</small><span id="ball-spot">OWN 25</span></div><span class="possession-chip" id="possession">NORTHSIDE BALL →</span><span id="timeout-count" class="scoreboard-sr-only">TIMEOUTS YOU 3 / CPU 3</span><span class="line-legend"><i class="scrimmage-key"></i> SCRIMMAGE <i class="first-down-key"></i> FIRST DOWN</span></div>
+      <p class="scoreboard-sr-only" id="scoreboard-announcement" role="status" aria-live="polite" aria-atomic="true"></p>
+      <div class="stadium-bar" aria-label="Stadium presentation">
+        <span class="stadium-heading"><i></i> MATCHDAY <span id="stadium-conditions">DAY / CLEAR</span></span>
+        <label for="stadium-weather">WEATHER <select id="stadium-weather"><option value="clear">Clear</option><option value="rain">Rain</option><option value="snow">Snow</option></select></label>
+        <label for="stadium-lighting">LIGHTING <select id="stadium-lighting"><option value="auto">Day / night cycle</option><option value="day">Day</option><option value="dusk">Dusk</option><option value="night">Night</option></select></label>
+        <button id="sound-toggle" type="button" aria-pressed="false" aria-label="Enable stadium sound">SOUND OFF</button>
+      </div>
+      <section id="strategy-panel" hidden></section>
       <div class="play-stage" id="play-stage">
       <aside class="playbook" id="playbook" aria-label="Offensive play selection" hidden>
         <div class="playbook-heading"><span>CALL YOUR PLAY</span><span>Q / E AUDIBLE</span></div>

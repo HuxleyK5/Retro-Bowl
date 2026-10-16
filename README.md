@@ -1,23 +1,48 @@
 # Pocket Field — Phase 6
 
-A complete four-quarter retro football exhibition with a twelve-play offensive playbook. You control your selected club's offense; its opponent chooses calls from the same playbook and uses the same passing, catching, running and defensive AI. Choose 1-, 2-, 5- or 15-minute quarters, play through halftime, and finish with a score and a quarter-by-quarter line score.
+A retro football franchise game with complete four-quarter matches and a twelve-play offensive playbook. Build one of 24 clubs across multiple seasons, manage real player careers and contracts, and chase the championship. You control your club's offense; opponents use the same passing, catching, running and defensive AI.
 
 ## Run
 
-Run `npm start` and open http://localhost:5173. Node.js is required. There are no runtime dependencies or build steps. Choose one of 24 clubs and click **Start Franchise** (or **Continue Saved Club**), then select a quarter length and click **Start Game**.
+Run `npm start` and open http://localhost:5173. Node.js is required. There are no runtime dependencies or build steps. Choose a club and click **Start Franchise**, then select a quarter length and click **Start Game**. **Franchise Hub** opens management before kickoff or pauses an ongoing game. **Continue Saved Club** restores your franchise at its hub.
 
 ## Fictional league (Phase 6)
 
 The Continental Gridiron League has 24 original clubs, each with a city, nickname, two colors, stadium, and offensive/defensive identity. Select any club to see its full roster, overall ratings, ages, potential, annual salaries, remaining contract years, and guaranteed money. Actual club names, uniforms, stadium labels, player names, ratings, and special-team specialists carry into the game. The next club in league order is the opening opponent.
 
-Each deterministic 53-player roster has 3 QB, 4 RB, 6 WR, 3 TE, 9 OL, 8 DL, 7 LB, 10 DB, a kicker, a punter, and a long snapper. `position` is the rating/gameplay group; `specialty` is the displayed depth position (TE uses WR ratings, DL/LB/DB use DEF, LS uses OL). The existing arcade field lineup remains 11 offensive and 8 defensive entities. Remaining players are roster depth; substitutions and injuries are future work. Overall is derived from attributes; potential and contracts are stored development/economy data.
+Each initial 53-player roster has 3 QB, 4 RB, 6 WR, 3 TE, 9 OL, 8 DL, 7 LB, 10 DB, a kicker, a punter, and a long snapper. All 1,272 players have distinct rating profiles and position strengths. `position` is the rating/gameplay group; `specialty` is the depth position (TE uses WR ratings, DL/LB/DB use DEF, LS uses OL). The arcade field lineup remains 11 offensive and 8 defensive entities, selected from healthy depth using effective abilities. Fatigue lowers actual movement and execution ratings without changing permanent skills.
 
 - `src/data/League.js`: club catalog and deterministic full roster generation.
 - `src/data/PlayerData.js`: validated persistent player records; optional metadata defaults preserve older records.
 - `src/data/Franchise.js`: versioned browser snapshot, validation, and safe recovery from corrupt or unavailable storage.
 - `src/ui/TeamSelection.js`: club picker and complete roster preview.
 
-**Continue Saved Club** restores the selected club and league rosters. **Start Franchise** replaces that snapshot. **League / New Franchise** returns to selection and stops the current game. These are franchise foundations, not a season simulator: schedules, trades, contract negotiations, and match-progress saves are not implemented. Identity labels describe clubs; they do not replace the existing coach AI.
+**Continue Saved Club** restores season progress, player careers, transactions, markets, and championship history. **Start Franchise** starts fresh and replaces the saved franchise. **League / New Franchise** returns to selection. Unfinished matches restart at kickoff after a reload; completed results are saved once, including all CPU games that week. Older roster-only saves migrate into a new season, and malformed saves recover safely.
+
+## Franchise mode
+
+The **Overview** shows the 12-week schedule, all 24 clubs' standings, results, championship history, and an eight-team playoff bracket. Play your game or simulate the full week. Wins, losses and ties determine seeds, followed by head-to-head results, point differential, points scored, and club ID. Playoff winners advance through quarterfinals, semifinals and a championship. Tied playoff games resolve in simulated overtime; regular-season ties stand.
+
+The **Roster** shows ratings, strengths, potential, age, fatigue, injuries and contracts. Train a player once per week in a position skill or balanced development; training raises a rating and adds fatigue. Starters earn experience through games, and experience improves skills toward potential. Use the weekly team recovery session to reduce fatigue. Injuries keep players out for one or more games, healthy backups take over automatically, and minimum-salary emergency players fill necessary depth when cap space permits. Players develop, age, decline and retire in the offseason.
+
+The **Market & trades** tab offers free agents, player-for-player trades, contract renewals and releases. Salary quotes appear before signing. Both clubs must keep playable depth and fit under the salary cap; CPU clubs can decline uneven trades. The starting cap is **$260M**, increasing $5M per season. Guaranteed contracts can leave dead money after release. Rosters can hold up to 75 players, and an over-cap team must clear room before playing. CPU clubs renew useful players and acquire replacements over successive seasons.
+
+After the championship, contracts lose a year and expiring players enter free agency. The **Draft** offers two rounds in reverse regular-season standings order, with CPU clubs making their picks between yours. Rookies sign three-year contracts. **Start Next Season** fills unused picks automatically and resets standings while preserving rosters and championship history. Roster moves and week advancement are locked during an unfinished match; the hub can still be browsed and the game resumed.
+
+- `src/data/FranchiseMode.js`: schedule, standings, playoffs, transactions, cap, CPU roster management and offseason.
+- `src/data/PlayerLifecycle.js`: healthy depth, fatigue, training, experience, injuries, development and aging.
+- `src/ui/FranchisePanel.js` / `franchise.css`: responsive management hub with keyboard-accessible tabs.
+- `tests/franchise.test.mjs`, `tests/lifecycle.test.mjs`, `tests/browser-franchise.mjs`: domain, persistence, live lineup and full season browser checks.
+
+## Matchday presentation
+
+The field sits inside a club-colored stadium with animated supporters, sideline substitutes, benches, chain crew and floodlights. The **LIGHTING** selector defaults to a gradual day-to-dusk-to-night transition across the four quarters; choose Day, Dusk or Night to hold the lighting. **WEATHER** switches between clear skies, rain and snow. These settings affect presentation only.
+
+Home shirts use club colors and away shirts use white with club trim. Outlined sprites, readable receiver numbers, a **YOU** marker, ball-carrier rings, bright yard lines and separate club end zones keep the action easy to follow. Touchdowns trigger a score band, confetti and a jumping celebration. Interceptions, defensive recoveries, fourth-down turnovers, fumbles and forceful hits have distinct feedback.
+
+Click **SOUND OFF** to enable locally synthesized stadium sound: crowd ambience and reactions, snap/pass/catch cues, impacts, whistles, kicking and a touchdown fanfare. Sound starts muted and requires a browser gesture. Pause freezes weather, lighting and celebrations and silences audio; new games clear old cues. Reduced-motion preferences replace confetti and jumps with static feedback and keep precipitation still. No external audio or image downloads are required.
+
+Run `node tests/browser-presentation.mjs` with the server running for presentation checks, including actual audio activation/suspension, weather and lighting rendering, touchdown/turnover effects, paused animation and desktop/mobile layouts.
 
 ## Controls
 
@@ -25,6 +50,9 @@ Each deterministic 53-player roster has 3 QB, 4 RB, 6 WR, 3 TE, 9 OL, 8 DL, 7 LB
 | --- | --- |
 | Space / contextual button | Snap, continue after a play, or kick the extra point |
 | Play buttons / Q and E | Choose a play or cycle audibles before the snap |
+| 0 / 1 / 2 / 3 | Manual aim / short / medium / deep passing depth |
+| M | Cycle receiver motion before the snap |
+| T / Timeout button | Spend one of three timeouts per half to stop the clock between scrimmage plays |
 | Roster / Ratings button | Inspect both teams; pauses the game and restores the previous pause state on close |
 | Mouse + left click | Hold, pull opposite your intended throw, then release behind the blue line of scrimmage |
 | WASD / arrow keys | Move QB or ball carrier |
@@ -52,11 +80,28 @@ Every player has a stable ID, name, jersey number, team, position and validated 
 
 Blocking and tackling are deterministic rating contests. Repeated broken tackles become harder so powerful runners are not invulnerable. Passing has bounded dispersion; catches use a skill-versus-difficulty margin with only ±0.02 execution variation, sampled once per pass. Clear catches and clear failures do not flip with a random roll. Human kicks use power and accuracy timing, with specialist ratings affecting distance and the accuracy window. CPU field goals and extra points retain distance-based odds.
 
-`src/data/PlayerData.js` stores persistent data separately from `Player` field state. `src/data/Rosters.js` provides versioned JSON serialization and reconstruction. Ratings survive play resets, audibles and possession swaps; each team keeps its own records. The league snapshot saves club choice and all player records locally; in-progress matches and season management are not yet persisted. See [the rating model and formulas](docs/ratings.md).
+`src/data/PlayerData.js` stores persistent data separately from `Player` field state. `src/data/Rosters.js` provides versioned JSON serialization and reconstruction. Ratings survive play resets, audibles and possession swaps; each team keeps its own records. The franchise save stores seasons and all player records locally; unfinished match state is not persisted. See [the rating model and formulas](docs/ratings.md).
 
 ## Offensive playbook (Phase 4)
 
 Before every user offensive snap, the selector shows all available calls, the formation, a route diagram and a short read. The full field previews the same routes. The gold path belongs to the running back. Click a call or use **Q/E** while the field has focus to audible, then press **Space** or **Snap Ball**. Your choice persists for the next human down. Audibles cannot change a live play, CPU possession, score, down, field position or either clock. The play clock continues while selecting; Pause freezes it.
+
+The **Sideline / Play Calling** panel adds formation overrides, lateral motion, defensive calls, passing depths and clock management. Choose Shotgun spread, Bunch right, Singleback tight or Offset left independently of the play, or keep its default formation. Routes move with the receiver alignments. Motion sends the slot receiver behind scrimmage toward either sideline; snap at any point to release from the actual moving position. Man defenders follow motion while zone defenders hold their landmarks. Formation changes, motion and audibles preserve the score, down, field position and both clocks.
+
+On CPU possessions, choose **Man**, **Cover 2**, **Cover 3** or **Blitz**, then use Balanced, Press, Cushion or Load the box. Calls lock at the snap. Zone defenders pass crossing receivers between lanes and protect their assigned depths. A blitz sends four actual rushers and leaves the back outlet open. Press disrupts nearby releases but can be beaten deep; cushion concedes short space; loading the box brings a safety toward the run and gives up deep help. The CPU chooses its defense from down, distance, field position and score, and its offense considers coverage and conversion distance. The panel explains the current matchup.
+
+| Defensive look | Opportunities and tradeoffs |
+| --- | --- |
+| Man | Slants and crosses force trailing defenders to turn; deep middle help remains |
+| Cover 2 | Posts can split the safeties; flat zones contest quick sideline throws |
+| Cover 3 | Curls, outs and crosses can find underneath space; three deep defenders contain vertical routes |
+| Blitz | Quick throws, screens and the back outlet exploit fewer cover defenders; deep calls need protection |
+
+**Short**, **Medium** and **Deep** lock the aim point to 5, 14 and 28 yards beyond scrimmage. Move the mouse across the field to choose the lane; the dotted preview uses the same selected depth as the released pass. QB range, pressure, accuracy, receiver timing and coverage still matter. **Manual aim / 0** retains full pull distance and direction. Depth can change before the snap or while the QB can still throw; a released pass cannot be redirected.
+
+Each club has **three timeouts per half**, shown beside down, distance and field position. A timeout stops the game clock and gives a 25-second play clock; it cannot interrupt a live play, kick, scoring sequence or break. Timeouts carry between quarters within a half and reset at halftime. **Spike** consumes a down and two seconds to stop the clock; **Kneel** consumes a down and one yard while keeping it running, including fourth-down turnover and own-end-zone safety risks.
+
+**Hurry-up** lines up automatically 0.35 seconds after an ordinary whistle, leaving the snap to you. **Chew clock** advances both running clocks at six times speed between plays until five seconds remain on the play clock; live football stays at normal speed. CPU coaches use their own charged timeouts, hurry when behind late, and run the clock or kneel when protecting a lead. Pause freezes motion, action and both clocks.
 
 | Call | Behavior |
 | --- | --- |
@@ -99,9 +144,9 @@ Hard tackles can cause fumbles. Ball security depends on Awareness, Strength and
 - The 40-second play clock counts down before the snap and on the result screen. Delay of game costs five yards or half the distance to the goal; the down and line to gain remain unchanged. The play clock resets to 25 after the penalty.
 - A live play or kick finishes even if the game clock reaches 0:00. A touchdown's extra point is resolved in the same quarter before the period ends.
 - Quarter one/three transitions preserve possession, ball position and downs. Halftime stops both clocks; the opponent receives the second-half kickoff with a fresh series.
-- The fourth quarter ends in a final-score screen. Regulation ties stand. New Game clears all scores and returns to setup.
+- The fourth quarter ends in a final-score screen and records the franchise result. Regular-season ties stand; a tied playoff game resolves in simulated overtime. Return to the hub to prepare for the next scheduled game.
 
-This is an intentionally simplified exhibition ruleset, not a specific league's full rulebook. No overtime, timeouts, two-minute warning, two-point conversions, punt returns, fumbles, penalty catalog or franchise management yet. Out-of-bounds plays always stop the game clock. A 35-second live-play limit prevents endless individual plays.
+This is an intentionally simplified match ruleset, not a specific league's full rulebook. Playable overtime, two-minute warnings, two-point conversions, punt returns and a full penalty catalog are not included. Out-of-bounds plays always stop the game clock. A 35-second live-play limit prevents endless individual plays.
 
 ## Architecture
 
@@ -116,13 +161,18 @@ The original loop, state, field, input, camera, player and render modules remain
 - `src/football/RatingEffects.js`: shared rating-to-ability formulas and deterministic contests.
 - `src/football/Blocking.js`: timed lineman/rusher engagements.
 - `src/ui/PlaybookPanel.js`: generated play buttons and the selected formation/route preview.
+- `src/ui/StrategyPanel.js` / `strategy.css`: formations, motion, depth, defensive calls, matchup reads and clock controls.
+- `src/football/Tactics.js`: defensive responsibilities, alignments, situational coverage selection and passing-depth targets.
+- `src/game/ClockStrategy.js`: CPU timeout and tempo decisions using the same match clocks and timeout limits.
 - `src/football/Playbook.js`: immutable play and formation definitions, coordinate conversion.
 - `src/football/PlayExecution.js`: per-play exchange timing, fake, release delays, run guidance and blocking assignments.
 - `src/football/Play.js`: snap-to-whistle gameplay, ratings, possession, catches and tackles; configurable formation at the current yard line.
 - `src/football/Routes.js` / `Defense.js`: route following, lead prediction, coverage, rush and pursuit.
 - `src/entities/Player.js` / `Football.js`: movement, acceleration, sprint/juke and airborne trajectory.
 - `src/world/Field.js` / `Camera.js`: dimensions, following, bounds and world/screen conversion.
-- `src/rendering/Renderer.js` / `PlayRenderer.js`: placeholder field/players, routes, markers, goalposts and football.
+- `src/rendering/Renderer.js` / `PlayRenderer.js`: club field, readable uniforms, routes, markers, goalposts and football.
+- `src/rendering/Stadium.js` / `PlayEffects.js`: cached crowds, weather, lighting and event animations, advanced only with simulation time.
+- `src/audio/StadiumAudio.js`: browser-gesture audio activation, procedural effects/crowd, touchdown music and pause/mute cleanup.
 - `src/core/GameLoop.js` / `GameState.js`: fixed 60 Hz simulation and global pause.
 - `src/input/Input.js`: keyboard, mouse and focus handling.
 - `src/main.js`: composition and lifecycle.
@@ -135,9 +185,11 @@ Run `npm test` for the simulation and match-rules suites. These cover the existi
 
 The playbook suite additionally verifies distinct live route trajectories, open-field completions for all passing concepts, all run exchange timings and lanes, the delayed draw, screen blocking, play-action lockout, steering overrides, audibles without clock resets, CPU execution and boundary-safe routes. `tests/browser-playbook.mjs` checks all twelve UI choices, formation previews, keyboard audibles, run handoffs, a mouse screen completion, pause/live/CPU restrictions and desktop/narrow layouts.
 
-The ratings suite compares low/high ratings under identical conditions: speed/acceleration, throw power, accuracy across seeds, awareness, cuts, difficult catches, interceptions, real pocket time, broken tackles and jukes. It also verifies data validation, independent teams, persistent changes and serialization. `tests/browser-ratings.mjs` checks both rosters, every required displayed stat, pause/resume and keyboard focus, plus responsive layouts. The suite includes 114 simulation/data checks and seven browser suites. Gameplay checks cover route windows, pursuit angles, contested catches, loose-ball physics, both recovery sides and fumble scoring. The league checks cover 24 rosters, unique identities, metadata, actual lineup binding, saved snapshots, malformed saves, and specialist abilities.
+The ratings suite compares low/high ratings under identical conditions: speed/acceleration, throw power, accuracy across seeds, awareness, cuts, difficult catches, interceptions, real pocket time, broken tackles and jukes. It also verifies data validation, independent teams, persistent changes and serialization. `tests/browser-ratings.mjs` checks both rosters, every required displayed stat, pause/resume and keyboard focus, plus responsive layouts. The suites include simulation/data checks and ten browser suites. Gameplay checks cover route windows, pursuit angles, contested catches, loose-ball physics, both recovery sides and fumble scoring. Franchise checks cover season progression, playoff seeding, championships, contracts, draft, cap enforcement, aging, fatigue, injuries, CPU roster continuity and saved-state validation.
 
-For browser verification, run `npm install`, keep the server running, and run `npm run test:browser`. Playwright uses installed Microsoft Edge. Checks include actual mouse/keyboard touchdown and PAT, CPU possessions, special teams, penalty UI, pause/focus loss, scoreboard, resizing and passing at four viewport sizes, halftime/final/new-game screens, and zero console/network errors. Full-match browser tests accelerate tick delivery with ten-second test quarters while preserving the real rules and gameplay; isolated scenarios set starting field position for edge-case checks. Screenshots are saved in `test-results/`.
+The tactics, clock and strategy-controller suites verify actual pocket pressure, coverage handoffs and route windows, continuous exchanges in all formations, motion releases, range-limited throw depths, charged timeouts, halftime resets, spikes/kneels, and CPU clock decisions. `tests/browser-strategy.mjs` verifies the same choices through the actual UI, mouse pass previews and releases, keyboard controls, paused clocks, and all match phases from 320 to 1440 pixels wide.
+
+For browser verification, run `npm install`, keep the server running, and run `npm run test:browser`. Playwright uses installed Microsoft Edge. Checks include actual mouse/keyboard touchdown and PAT, CPU possessions, special teams, penalty UI, pause/focus loss, scoreboard, resizing and passing at four viewport sizes, halftime/final/next-game screens, and zero console/network errors. Full-match browser tests accelerate tick delivery with ten-second test quarters while preserving the real rules and gameplay; isolated scenarios set starting field position for edge-case checks. The franchise browser suite exercises management, autosave/reload, injuries in the live lineup, a complete season, the playoffs, the draft and year two. Screenshots are saved in `test-results/`.
 
 Passing: hold the left mouse button anywhere on the field after the snap, pull back, and release. A longer pull adds distance (full power at 180 screen pixels). Dots preview the flight arc and a ring marks the landing point. Aim ahead of moving receivers; QB accuracy still adds dispersion. Tiny clicks do not throw. Pause, focus loss, or window resizing cancels the gesture.
 

@@ -38,21 +38,42 @@ const first = 'Adrian Bennett Callum Darius Ellis Felix Graham Holden Isaiah Jas
 const last = 'Abbott Bell Calder Drake Ellison Finch Garner Hollis Iverson Jarrett Keller Langford Maddox Norwood Oakley Palmer Quill Ramsey Sutter Talbot Underwood Voss Whitaker York Arden Beckett Corbin Dempsey Easton Farrow Granger Harlan Ingram Kenner Lennox Merritt Niles Osborn Prescott Ridley'.split(' ');
 // Gameplay groups stay compatible with the arcade lineup; specialty is the depth-chart position.
 const depth = [['QB','QB',3],['RB','RB',4],['WR','WR',6],['WR','TE',3],['OL','OL',9],['DEF','DL',8],['DEF','LB',7],['DEF','DB',10],['K','K',1],['P','P',1],['OL','LS',1]];
+function seededRating(serial, key) {
+  let value = (serial + 1) * 2654435761;
+  for (const letter of key) value = Math.imul(value ^ letter.charCodeAt(0), 16777619);
+  value ^= value >>> 16;
+  return (value >>> 0) % 7 - 3;
+}
+const profiles = {
+  QB: [['accuracy','awareness'], ['throwPower','accuracy'], ['speed','throwPower']],
+  RB: [['speed','elusiveness'], ['strength','awareness'], ['acceleration','catching']],
+  WR: [['speed','acceleration'], ['catching','awareness'], ['routeRunning','catching']],
+  TE: [['strength','blocking'], ['catching','awareness'], ['routeRunning','catching']],
+  OL: [['strength','blocking'], ['blocking','awareness']], LS: [['blocking','awareness']],
+  DL: [['passRush','strength'], ['tackling','awareness']], LB: [['tackling','awareness'], ['passRush','strength'], ['coverage','speed']],
+  DB: [['coverage','awareness'], ['speed','tackling'], ['coverage','tackling']],
+  K: [['kickAccuracy','awareness'], ['kickPower','kickAccuracy']], P: [['kickPower','awareness'], ['kickAccuracy','kickPower']],
+};
+const market = { QB: 2.1, RB: .85, WR: 1.05, TE: .85, OL: 1.05, DL: 1.15, LB: .95, DB: 1, K: .45, P: .35, LS: .25 };
 export function createLeague() {
   return TEAMS.map((team, ti) => {
     let index = 0;
     const roster = depth.flatMap(([position,specialty,count]) => Array.from({length:count}, (_,rank) => {
       const n = index++, serial = ti*53+n;
       const nameIndex = (serial * 37) % (first.length * last.length);
-      const jitter = (offset) => ((serial*17+offset*13)%11)-5;
-      const base = 83-Math.min(rank,5)*3+jitter(1);
-      const ratings = { kickPower: base, kickAccuracy: base, awareness: base, strength: base, speed: position==='DEF'?45+jitter(2):position==='OL'?47+jitter(2):position==='QB'?55+jitter(2):84+jitter(2), acceleration: 80+jitter(3), accuracy:base+3, throwPower:base, catching:base+4, routeRunning:base, elusiveness:base, blocking:base, tackling:base, coverage:base, passRush:base };
-      if (specialty==='DL') { ratings.speed=32+jitter(2); ratings.passRush+=5; ratings.coverage=45; }
-      const yearsRemaining=1+(serial%4), annualSalary=Math.round((.75+Math.max(0,base-60)*.24)*1000000);
+      const base = 84-Math.min(rank,7)*4+(seededRating(ti,'team') % 2);
+      const ratings = Object.fromEntries(['kickPower','kickAccuracy','throwPower','accuracy','speed','acceleration','strength','elusiveness','catching','routeRunning','blocking','tackling','coverage','passRush','awareness'].map(key => [key, base + seededRating(serial,key)]));
+      ratings.speed = (position==='DEF'?45:position==='OL'?47:position==='QB'?55:84) + seededRating(serial,'speed');
+      ratings.acceleration = (position==='OL'?62:position==='DEF'?70:80) + seededRating(serial,'acceleration');
+      if (specialty==='DL') { ratings.speed=32+seededRating(serial,'speed'); ratings.passRush+=5; ratings.coverage=45+seededRating(serial,'coverage'); }
+      if (specialty==='TE') { ratings.speed-=6; ratings.blocking+=4; }
+      const profile = profiles[specialty][(ti+rank)%profiles[specialty].length];
+      for (const key of profile) ratings[key]+=5;
+      const yearsRemaining=1+(serial%4), annualSalary=Math.round((.65+Math.max(0,base-60)*.24)*market[specialty]*1000000/10000)*10000;
       const player = new PlayerData({ id:`${team.id}-p${n+1}`, teamId:team.id, name:`${first[nameIndex%first.length]} ${last[Math.floor(nameIndex/first.length)]}`, number:String(n+1), position, specialty, age:21+(serial%14), ratings, potential:99, contract:{yearsRemaining,annualSalary,guaranteed:Math.round(annualSalary*yearsRemaining*.45)} });
       player.potential=Math.min(99,player.overall+2+(serial%10));
       return player;
-    }));
+    }).sort((a,b)=>b.overall-a.overall));
     // Coverage players first, followed by the front: these eight occupy the arcade defense.
     const starters = [roster.filter(p=>p.specialty==='DB').slice(0,4),roster.filter(p=>p.specialty==='LB').slice(0,1),roster.filter(p=>p.specialty==='DL').slice(0,2),roster.filter(p=>p.specialty==='LB').slice(1,2)].flat();
     return {...team, roster:[...roster.filter(p=>p.position!=='DEF'),...starters,...roster.filter(p=>p.position==='DEF'&&!starters.includes(p))]};

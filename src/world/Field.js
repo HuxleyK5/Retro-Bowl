@@ -4,7 +4,7 @@ export class Field {
     this.width = 120 * this.yard;
     this.height = 53.333 * this.yard;
     this.endZone = 10 * this.yard;
-    this.margin = 95;
+    this.margin = 180;
   }
   constrain(player) {
     player.x = Math.max(player.radius, Math.min(this.width - player.radius, player.x));

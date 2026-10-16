@@ -55,5 +55,6 @@ export class RatingsPanel {
       ? `Arm range ${(throwRange(data.ratings) / 20).toFixed(0)} yd · Ball speed ${(throwVelocity(data.ratings) / 20).toFixed(1)} yd/s`
       : `Run speed ${(topSpeed(data.ratings) / 20).toFixed(1)} yd/s · Sprint ${(topSpeed(data.ratings) * SPRINT_MULTIPLIER / 20).toFixed(1)} yd/s · Acceleration ${(acceleration(data.ratings) / 20).toFixed(1)} yd/s²`;
     document.querySelector('#ratings-identity').textContent = `Age ${data.age} / Potential ${data.potential} / ${data.contract.yearsRemaining} years / $${(data.contract.annualSalary/1000000).toFixed(2)}M per year / $${(data.contract.guaranteed/1000000).toFixed(2)}M guaranteed / ID ${data.id}`;
+    document.querySelector('#ratings-identity').textContent += ` / Fatigue ${Math.round(data.fatigue)}% / ${data.injury ? `${data.injury.name}: out ${data.injury.weeksRemaining} week(s)` : 'Healthy'} / Strengths: ${data.strengths.join(', ')}`;
   }
 }

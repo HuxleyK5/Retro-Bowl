@@ -1,4 +1,5 @@
 import { kickExecution } from './KickMeter.js';
+import { effectiveRatings } from '../data/PlayerLifecycle.js';
 export const TEAMS = { home: 'NORTHSIDE', away: 'EASTBANK' };
 
 const other = team => team === 'home' ? 'away' : 'home';
@@ -21,6 +22,8 @@ export class MatchRules {
     this.phase = 'pregame'; this.quarter = 1; this.quarterSeconds = 120; this.clock = 120;
 
     this.playClock = 40; this.clockRunning = false; this.possession = 'home';
+
+    this.timeouts = { home: 3, away: 3 };
 
     this.score = { home: 0, away: 0 }; this.byQuarter = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
 
@@ -46,13 +49,37 @@ export class MatchRules {
 
   get fieldGoalDistance() { return Math.round(100 - this.spot + 17); }
 
-  get fieldGoalChance() { const k = this.specialists?.[this.possession]?.kicker; const boost = k ? (k.ratings.kickAccuracy-80)*.004+(k.ratings.kickPower-80)*.002 : 0; return clamp(.98 + boost - Math.max(0, this.fieldGoalDistance - 30) * .017 - Math.max(0, this.fieldGoalDistance - 50) * .022, 0, .98); }
+  get fieldGoalChance() { const k = this.specialists?.[this.possession]?.kicker, ratings = k ? effectiveRatings(k) : null; const boost = ratings ? (ratings.kickAccuracy-80)*.004+(ratings.kickPower-80)*.002 : 0; return clamp(.98 + boost - Math.max(0, this.fieldGoalDistance - 30) * .017 - Math.max(0, this.fieldGoalDistance - 50) * .022, 0, .98); }
 
   addScore(team, points) { this.score[team] += points; this.byQuarter[team][this.quarter - 1] += points; }
 
   newSeries(spot) { this.spot = clamp(spot, .5, 99.5); this.down = 1; this.firstDownLine = Math.min(100, this.spot + 10); }
 
   changePossession(spot = 25) { this.possession = other(this.possession); this.newSeries(spot); this.clockRunning = false; }
+
+  canTimeout(team = 'home') {
+
+    return ['home', 'away'].includes(team) && this.timeouts[team] > 0 && this.clock > 0
+      && ['ready', 'result'].includes(this.phase) && !this.next && !this.kickoffPending;
+
+  }
+
+  timeout(team = 'home') {
+
+    if (!this.canTimeout(team)) return false;
+
+    this.timeouts[team]--; this.clockRunning = false;
+
+    // A charged timeout gives both coaches a fresh 25-second play clock.
+    // Continuing from a result preserves this reset and the stopped game clock.
+    this.playClock = 25;
+
+    const remaining = this.timeouts[team];
+    this.detail = `${this.teams[team]} timeout. Clock stopped. ${remaining} timeout${remaining === 1 ? '' : 's'} remaining this half.`;
+
+    return true;
+
+  }
 
   beginPlay() {
 
@@ -98,7 +125,7 @@ export class MatchRules {
 
     const start = this.spot;
 
-    let end = Number.isFinite(spot) ? Math.round(spot * 10) / 10 : start;
+    let end = type === 'KNEEL' ? start - 1 : type === 'SPIKE' ? start : Number.isFinite(spot) ? Math.round(spot * 10) / 10 : start;
 
     const fumbleOut = type === 'FUMBLE_OUT_OF_BOUNDS';
 
@@ -160,9 +187,9 @@ export class MatchRules {
 
     }
 
-    if (type === 'TOUCHDOWN' || (end >= 100 && type !== 'INCOMPLETE')) { this.touchdown(); return true; }
+    if (type === 'TOUCHDOWN' || (end >= 100 && type !== 'INCOMPLETE' && type !== 'SPIKE')) { this.touchdown(); return true; }
 
-    if (type === 'SAFETY' || (end <= 0 && type !== 'INCOMPLETE')) {
+    if (type === 'SAFETY' || (end <= 0 && type !== 'INCOMPLETE' && type !== 'SPIKE')) {
 
       this.addScore(other(this.possession), 2); this.changePossession(25); this.kickoffPending = true;
 
@@ -170,7 +197,7 @@ export class MatchRules {
 
     }
 
-    const incomplete = type === 'INCOMPLETE';
+    const incomplete = type === 'INCOMPLETE' || type === 'SPIKE';
 
     this.spot = incomplete ? start : clamp(end, .5, 99.5);
 
@@ -183,6 +210,9 @@ export class MatchRules {
     this.result = incomplete ? 'INCOMPLETE' : gain < 0 ? (type === 'SACK' ? 'SACK' : 'TACKLE FOR LOSS') : gain === 0 ? 'NO GAIN' : `Gain of ${gain} ${unit}`;
 
     this.detail = fumbleOut ? 'Fumble out of bounds. Clock stopped.' : incomplete ? 'Pass falls incomplete. The clock stops.' : gain < 0 ? `Loss of ${amount} ${unit}.` : `${type === 'OUT OF BOUNDS' ? 'Out of bounds. Clock stopped.' : 'Runner down in bounds. Clock running.'}`;
+
+    if (type === 'KNEEL') { this.result = 'QB KNEEL'; this.detail = 'Quarterback kneels for a loss of 1 yard. Clock running.'; }
+    if (type === 'SPIKE') { this.result = 'SPIKE'; this.detail = 'Quarterback spikes the ball. Down used; clock stopped.'; }
 
     if (this.spot >= this.firstDownLine - .001) {
 
@@ -216,15 +246,16 @@ export class MatchRules {
 
     if (extra ? this.phase !== 'extraPoint' : this.phase !== 'ready' || !['fieldGoal', 'punt'].includes(kind) || this.clock <= 0) return false;
 
-    this.kick = { kind, from: this.spot, chance: extra ? clamp(.94 + ((this.specialists?.[this.possession]?.kicker.ratings.kickAccuracy ?? 80)-80)*.003, .5, .99) : this.fieldGoalChance, distance: extra ? 33 : this.fieldGoalDistance };
+    const kicker = this.specialists?.[this.possession]?.kicker, punter = this.specialists?.[this.possession]?.punter;
+    this.kick = { kind, from: this.spot, chance: extra ? clamp(.94 + ((kicker ? effectiveRatings(kicker).kickAccuracy : 80)-80)*.003, .5, .99) : this.fieldGoalChance, distance: extra ? 33 : this.fieldGoalDistance };
 
-    if (kind === 'punt') this.kick.landing = Math.round(this.spot + 36 + ((this.specialists?.[this.possession]?.punter.ratings.kickPower ?? 80)-80)*.3 + Math.floor(this.random() * 16));
+    if (kind === 'punt') this.kick.landing = Math.round(this.spot + 36 + ((punter ? effectiveRatings(punter).kickPower : 80)-80)*.3 + Math.floor(this.random() * 16));
 
     else this.kick.good = this.random() < this.kick.chance;
 
     if (execution) {
       const specialist = this.specialists?.[this.possession]?.[kind === 'punt' ? 'punter' : 'kicker'];
-      const result = kickExecution(kind, specialist?.ratings, this.kick.distance, execution);
+      const result = kickExecution(kind, specialist ? effectiveRatings(specialist) : undefined, this.kick.distance, execution);
       Object.assign(this.kick, result);
       if (kind === 'punt') this.kick.landing = this.spot + result.yards;
     }
@@ -299,11 +330,13 @@ export class MatchRules {
 
   advanceQuarter() {
 
+    if (['halftime', 'quarterBreak', 'final'].includes(this.phase)) return;
+
     this.clockRunning = false;
 
     if (this.quarter === 4) { this.kickoffPending = false; this.phase = 'final'; return; }
 
-    if (this.quarter === 2) { this.phase = 'halftime'; return; }
+    if (this.quarter === 2) { this.timeouts = { home: 3, away: 3 }; this.phase = 'halftime'; return; }
 
     this.breakQuarter = this.quarter; this.quarter++; this.clock = this.quarterSeconds; this.phase = 'quarterBreak';
 

@@ -5,6 +5,8 @@ import { Defense } from './Defense.js';
 import { getPlay } from './Playbook.js';
 import { PlayExecution } from './PlayExecution.js';
 import { createRosters } from '../data/Rosters.js';
+import { availableRoster } from '../data/PlayerLifecycle.js';
+import { configureDefense, targetForDepth } from './Tactics.js';
 import { Blocking } from './Blocking.js';
 import { throwRange, throwVelocity, throwSpread, catchMargin, tackleResult, releaseReaction, reactionTime, fumbleChance, SPRINT_MULTIPLIER } from './RatingEffects.js';
 
@@ -43,6 +45,7 @@ export class Play {
     this.bindRoster('home');
     for (const p of this.players) {
       p.baseSpawn = { ...p.spawn };
+      p.baseAssignment = p.assignment;
       if (p.route) p.baseRoute = p.route.map(point => ({ ...point }));
     }
     this.routes = new Routes(this.receivers); this.defense = new Defense(); this.ball = new Football();
@@ -52,16 +55,17 @@ export class Play {
   }
   bindRoster(possession) {
     const slots = {};
+    const lineups = Object.fromEntries(Object.entries(this.rosters).map(([side, roster]) => [side, availableRoster({ roster })]));
     for (const player of this.players) {
       const teamId = player.team === 'home' ? possession : possession === 'home' ? 'away' : 'home';
       const position = { QUARTERBACK: 'QB', 'RUNNING BACK': 'RB', RECEIVER: 'WR', LINEMAN: 'OL', DEFENDER: 'DEF' }[player.role], key = `${teamId}-${position}`;
       const index = slots[key] || 0; slots[key] = index + 1;
-      const record = this.rosters[teamId]?.filter(data => data.position === position)[index];
+      const record = lineups[teamId]?.filter(data => data.position === position)[index];
       if (!record) throw new Error(`Missing roster slot ${key} ${index}`);
       player.bindData(record);
     }
   }
-  configure(spot, possession = 'home', firstDown = Math.min(100, spot + 10), playId = null) {
+  configure(spot, possession = 'home', firstDown = Math.min(100, spot + 10), playId = null, options = {}) {
     this.bindRoster(possession);
     this.lineOfScrimmage = this.field.endZone + spot * this.field.yard;
     this.firstDownX = this.field.endZone + firstDown * this.field.yard;
@@ -69,16 +73,19 @@ export class Play {
     for (const p of this.players) {
       p.spawn = { x: clamp(p.baseSpawn.x + offset, 20, this.field.width - 20), y: p.baseSpawn.y };
       p.uniform = possession === 'home' ? p.team : p.team === 'home' ? 'away' : 'home';
+      if (p.baseAssignment !== undefined) p.assignment = p.baseAssignment;
       if (p.baseRoute) p.route = p.baseRoute.map(point => ({ x: clamp(point.x + offset, 25, this.field.width - 30), y: point.y }));
     }
-    this.call = null;
+    this.call = null; this.coverage = null; this.defensiveAdjustment = 'balanced'; this.formation = null;
     this.receivers.forEach(p => { p.releaseDelay = 0; });
     if (playId) {
       const call = getPlay(playId);
       if (!call) throw new Error(`Unknown play: ${playId}`);
-      this.execution.apply(call);
+      this.execution.apply(call, options.formation === 'play' ? null : options.formation);
     }
+    if (options.coverage) configureDefense(this, options.coverage, options.adjustment || 'balanced');
     this.reset();
+    this.execution.startMotion(options.motion || 'none');
   }
   get outcome() {
     return { type: this.result, spot: ((this.carrier?.x ?? this.ball.x) - this.field.endZone) / this.field.yard,
@@ -99,7 +106,9 @@ export class Play {
   get canThrow() { return this.phase === 'passing' && this.carrier === this.qb && !this.hasThrown && this.qb.x < this.lineOfScrimmage && this.execution.canPass; }
   snap() {
     if (this.phase !== 'presnap') return false;
-    this.phase = 'passing'; this.notice = 'Hold mouse, pull back, release to pass · H to hand off'; return true;
+    this.execution.finishMotion();
+    this.phase = 'passing'; this.notice = 'Hold mouse, pull back, release to pass · H to hand off';
+    this.emit('snap', this.qb); return true;
   }
   handoff() {
     if (!this.canThrow || this.elapsed > 1.8 || distance(this.qb, this.rb) > 220) return false;
@@ -119,7 +128,8 @@ export class Play {
     if (!this.live || this.execution.locked || this.ball.mode !== 'held' || !this.carrier.juke(direction)) return false;
     this.emit('juke'); return true;
   }
-  aim(point) {
+  aim(point, depth = 'auto') {
+    point = targetForDepth(this, point, depth);
     let receiver = null; let nearest = 100;
     for (const p of point.manual ? [] : this.receivers) { const d = distance(p, point); if (d < nearest) { receiver = p; nearest = d; } }
     let target = { ...point };
@@ -147,9 +157,9 @@ export class Play {
     }
     return { separation, risk: separation < 45 ? 'danger' : separation < 90 ? 'contested' : 'open' };
   }
-  throw(point) {
+  throw(point, depth = 'auto') {
     if (!this.canThrow || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
-    const plan = this.aim(point);
+    const plan = this.aim(point, depth);
     this.passDistance = distance(this.qb, plan.target);
     const pressure = this.defenders.some(d => distance(d, this.qb) < 150) ? 1 : 0;
     const moving = Math.hypot(this.qb.vx, this.qb.vy) > 30;
@@ -159,6 +169,7 @@ export class Play {
     this.catchJitter = (this.random() - .5) * .04;
     const target = { x: plan.target.x + Math.cos(angle) * error, y: plan.target.y + Math.sin(angle) * error };
     this.ball.throw(this.qb, target, plan.duration);
+    this.emit('pass', this.qb);
     this.hasThrown = true; this.carrier = null; this.phase = 'flight';
     this.notice = 'BALL IN THE AIR · Control transfers automatically on a catch'; return true;
   }
@@ -232,7 +243,7 @@ export class Play {
       if (recoverer) {
         this.carrier = this.controlled = recoverer; this.ball.attach(recoverer);
         this.recoveredBy = recoverer.team === 'away' ? 'defense' : 'offense';
-        this.emit('recovery', recoverer, this.recoveredBy === 'defense' ? 'DEFENSE RECOVERS' : 'OFFENSE RECOVERS');
+        this.emit('recovery', recoverer, this.recoveredBy === 'defense' ? 'TURNOVER / DEFENSE RECOVERS' : 'OFFENSE RECOVERS');
         if (this.recoveredBy === 'defense') this.finish('FUMBLE', 'Defense recovers the loose ball.');
         else {
           this.phase = 'running'; this.autoRunAfterCatch = true; this.catchSteeringReady = false; this.catchProtection = .4;
@@ -256,6 +267,7 @@ export class Play {
     this.players.forEach(p => { p.moving = false; p.vx = 0; p.vy = 0; });
   }
   update(dt, movement = still, computerControlled = false) {
+    if (this.phase === 'presnap') this.execution.updatePresnap(dt);
     if (!this.live) return;
     this.elapsed += dt;
     this.catchProtection = Math.max(0, this.catchProtection - dt);
@@ -306,6 +318,8 @@ export class Play {
             this.emit('brokenTackle', p, 'BROKEN TACKLE');
             this.notice = 'BROKEN TACKLE · Keep moving!'; continue;
           }
+          const collisionSpeed = Math.hypot(p.vx - defender.vx, p.vy - defender.vy);
+          if (defender.ratings.tackling >= 78 && collisionSpeed >= p.speed * .72) this.emit('bigHit', p, 'BIG HIT!');
           const sideHit = Math.abs((defender.x - p.x) * p.vy - (defender.y - p.y) * p.vx) > d * p.speed * .5;
           if (this.random() < fumbleChance(defender.ratings, p.ratings, { momentum, sideHit }) && this.forceFumble(defender)) return;
           this.finish(p.x < this.field.endZone ? 'SAFETY' : p === this.qb && p.x < this.lineOfScrimmage ? 'SACK' : 'TACKLED'); return;

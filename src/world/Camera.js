@@ -2,7 +2,8 @@ export class Camera {
   constructor(field) { this.field = field; this.x = field.width / 2; this.y = field.height / 2; this.zoom = 1; this.width = 1; this.height = 1; }
   resize(width, height) {
     this.width = width; this.height = height;
-    this.zoom = Math.max(0.22, Math.min(width / 1420, height / 900));
+    this.zoom = Math.max(0.22, width / (this.field.width + this.field.margin * 2), height / (this.field.height + this.field.margin * 2),
+      Math.min(width / 1420, height / (this.field.height + 300)));
   }
   follow(target, dt, immediate = false) {
     const halfW = this.width / this.zoom / 2;

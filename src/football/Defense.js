@@ -5,7 +5,7 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 export class Defense {
   constructor() { this.reset(); }
-  reset() { this.reads = new WeakMap(); this.time = 0; this.lastElapsed = 0; }
+  reset() { this.reads = new WeakMap(); this.edgeRush = new WeakSet(); this.time = 0; this.lastElapsed = 0; }
   update(play, dt) {
     const { defenders, receivers, carrier, ball, field } = play;
     if (play.elapsed < this.lastElapsed) this.reset();
@@ -21,7 +21,10 @@ export class Defense {
       let sprint = false;
       const receiver = receivers[Math.max(0, defender.assignment)];
       const deepHelp = receiver && (defender.baseSpawn || defender.spawn).x - (receiver.baseSpawn || receiver.spawn).x > field.yard * 20;
-      if (ball.mode === 'flight') {
+      if (play.coverage && defender.coverageRole) {
+        const decision = this.tacticalTarget(play, defender);
+        target = decision.target; sprint = decision.sprint;
+      } else if (ball.mode === 'flight') {
         // Only nearby defenders break on the pass; everyone else keeps coverage.
         const readingPass = ball.elapsed < reactionTime(defender.ratings);
         target = !readingPass && distance(defender, ball.target) < 190 + defender.ratings.awareness * 2 ? ball.target :
@@ -37,6 +40,76 @@ export class Defense {
       if (!target || play.blocking.blocks(play, defender)) target = defender;
       defender.update(dt, steer(defender, target, sprint), field);
     }
+  }
+  updatePresnap(play, dt) {
+    if (!play.coverage) return;
+    // Man defenders travel with motion. Zone defenders hold their landmarks;
+    // this gives motion a visible coverage read without revealing the playbook.
+    for (const defender of play.defenders) {
+      const role = defender.coverageRole;
+      if (role?.type !== 'man') continue;
+      const receiver = play.receivers[role.receiverIndex];
+      if (!receiver) continue;
+      const cushion = play.defensiveAdjustment === 'press' ? 1.2 : play.defensiveAdjustment === 'cushion' ? 9 : 5;
+      const target = { x: Math.max(play.lineOfScrimmage + play.field.yard * .4, receiver.x + cushion * play.field.yard),
+        y: receiver.y + Math.sign(play.field.height / 2 - receiver.y) * play.field.yard * .6 };
+      defender.update(dt, steer(defender, target), play.field);
+    }
+  }
+  tacticalTarget(play, defender) {
+    const { field, carrier, ball } = play, role = defender.coverageRole;
+    const adjustment = play.defensiveAdjustment || 'balanced';
+    const receiver = role.type === 'man' ? play.receivers[role.receiverIndex] : null;
+    const coverage = () => role.type === 'man' ? this.coverageTarget(defender, receiver, field, adjustment) :
+      role.type === 'zone' ? this.zoneTarget(play, defender) : this.rushTarget(play, defender);
+    const delay = reactionTime(defender.ratings);
+    if (ball.mode === 'flight') {
+      const canBreak = ball.elapsed >= delay && distance(defender, ball.target) < field.yard * (role.deep ? 13 : 9) + defender.ratings.awareness;
+      return { target: canBreak ? ball.target : coverage(), sprint: canBreak };
+    }
+    const handoffRead = adjustment === 'box' ? .1 : .35 + delay * .4;
+    const runRecognized = play.phase === 'running' && carrier &&
+      (carrier !== play.rb || play.elapsed >= (play.call?.exchangeTime || 0) + handoffRead);
+    if (runRecognized || play.elapsed > 6) return { target: carrier ? this.pursuitTarget(defender, carrier, field) : ball, sprint: true };
+    if (role.type === 'rush') return { target: this.rushTarget(play, defender), sprint: play.coverage === 'blitz' };
+    if (adjustment === 'press' && receiver && play.elapsed < .65 && receiver.x < play.lineOfScrimmage + field.yard * 4 && distance(defender, receiver) < 45) {
+      // Contact affects the receiver's actual release and momentum. Faster,
+      // stronger releases escape sooner; no catch/success roll is modified.
+      const leverage = clamp((defender.ratings.strength + defender.ratings.coverage - receiver.ratings.strength - receiver.ratings.routeRunning + 50) / 140, .1, .65);
+      receiver.vx *= 1 - leverage * .1; receiver.vy *= 1 - leverage * .1;
+    }
+    return { target: coverage(), sprint: false };
+  }
+  rushTarget(play, defender) {
+    const role = defender.coverageRole;
+    const fake = play.call?.fakeDuration;
+    const fooled = fake && play.elapsed < fake + (99 - defender.ratings.awareness) * .012;
+    const target = fooled ? play.rb : play.carrier || play.qb;
+    // Edge pressure first clears the tackles; central rushers attack the
+    // pocket directly. Extra rushers therefore open real outlet lanes.
+    if (Math.abs(role.lane) > 5 && defender.x > play.lineOfScrimmage - play.field.yard * 6.5)
+      return { x: play.lineOfScrimmage - play.field.yard * 7.5, y: play.field.height / 2 + role.lane * play.field.yard };
+    if (Math.abs(role.lane) > 5 && !this.edgeRush.has(defender)) {
+      if (Math.abs(defender.y - target.y) < play.field.yard * 2 && defender.x < target.x) this.edgeRush.add(defender);
+      else return { x: target.x - play.field.yard * 2.5, y: target.y };
+    }
+    return target;
+  }
+  zoneTarget(play, defender) {
+    const { field, lineOfScrimmage: line, receivers } = play, role = defender.coverageRole;
+    const low = role.low * field.height, high = role.high * field.height;
+    const reads = receivers.map(receiver => this.readReceiver(defender, receiver));
+    const threats = reads.filter(read => read.y >= low - 20 && read.y <= high + 20 && read.x > line - field.yard * 4 &&
+      (role.deep ? read.x > line + field.yard * (role.depth - 10) : read.x < line + field.yard * (role.depth + 9)));
+    if (!threats.length) return role.anchor;
+    threats.sort((a, b) => role.deep ? (b.x - Math.abs(b.y - defender.y) * .3) - (a.x - Math.abs(a.y - defender.y) * .3) :
+      distance(a, defender) - distance(b, defender));
+    const threat = threats[0], shift = play.defensiveAdjustment === 'cushion' ? field.yard * 2 : 0;
+    return {
+      x: clamp(role.deep ? Math.max(role.anchor.x, threat.x + field.yard * 4) :
+        Math.min(line + field.yard * (role.depth + 5) + shift, Math.max(line + field.yard * 1.5, threat.x + field.yard * 1.2 + shift)), defender.radius, field.width - defender.radius),
+      y: clamp(threat.y * (role.deep ? .78 : .94) + role.anchor.y * (role.deep ? .22 : .06), Math.max(defender.radius, low), Math.min(field.height - defender.radius, high)),
+    };
   }
   readReceiver(defender, receiver) {
     const samples = this.reads.get(receiver);
@@ -58,12 +131,13 @@ export class Defense {
     observed.x += observed.vx * age; observed.y += observed.vy * age;
     return observed;
   }
-  coverageTarget(defender, receiver, field) {
+  coverageTarget(defender, receiver, field, adjustment = 'balanced') {
     if (!receiver) return defender;
     const r = defender.ratings;
     const read = this.readReceiver(defender, receiver);
     const lead = .06 + r.awareness * .001;
-    const cushion = 18 + (99 - r.coverage) * .48;
+    const cushion = adjustment === 'press' ? 7 + (99 - r.coverage) * .2 :
+      adjustment === 'cushion' ? field.yard * 3 + (99 - r.coverage) * .48 : 18 + (99 - r.coverage) * .48;
     const inside = (read.y < field.height / 2 ? 1 : -1) * (11 + (99 - r.coverage) * .3);
     return {
       x: clamp(read.x + read.vx * lead + cushion, defender.radius, field.width - defender.radius),

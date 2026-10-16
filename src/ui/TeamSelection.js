@@ -1,4 +1,4 @@
-import { LEAGUE_NAME } from '../data/League.js';
+import { createLeague, LEAGUE_NAME } from '../data/League.js';
 export class TeamSelection {
   constructor(league, saved, onStart) {
     this.saved=saved; this.league=league; this.selected=league.find(t=>t.id===saved?.teamId)||league[0];
@@ -12,9 +12,9 @@ export class TeamSelection {
       button.append(city,name); button.addEventListener('click',()=>{this.selected=team;this.render();});grid.append(button);
     }
     document.querySelector('#league-name').textContent=LEAGUE_NAME;
-    document.querySelector('#start-franchise').addEventListener('click',()=>onStart(this.league,this.selected.id));
+    document.querySelector('#start-franchise').addEventListener('click',()=>onStart(createLeague(),this.selected.id));
     const resume=document.querySelector('#continue-franchise');resume.hidden=!saved;
-    resume.addEventListener('click',()=>onStart(this.saved.league,this.saved.teamId));
+    resume.addEventListener('click',()=>onStart(this.saved.league,this.saved.teamId,this.saved.mode));
     this.render();
   }
   render() {

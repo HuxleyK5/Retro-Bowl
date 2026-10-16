@@ -1,4 +1,5 @@
 import { PlayerData } from '../data/PlayerData.js';
+import { effectiveRatings } from '../data/PlayerLifecycle.js';
 import { topSpeed, acceleration, routeAcceleration, jukeDuration, jukeCooldown, SPRINT_MULTIPLIER, JUKE_MULTIPLIER } from '../football/RatingEffects.js';
 
 export class Player {
@@ -21,7 +22,7 @@ export class Player {
     this.brokenTackles = 0;
   }
   bindData(data) { if (!(data instanceof PlayerData)) throw new TypeError('Player needs PlayerData.'); this.data = data; this.number = data.number; }
-  get ratings() { return this.data.ratings; }
+  get ratings() { return effectiveRatings(this.data); }
   setRatings(patch) { this.data.setRatings(patch); }
   get speed() { return topSpeed(this.ratings); }
   get acceleration() { return acceleration(this.ratings); }

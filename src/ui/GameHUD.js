@@ -9,20 +9,92 @@ const names = { kickMeter: 'KICK METER', kickoff: 'KICKOFF', return: 'KICK RETUR
 export class GameHUD {
   constructor(match) {
     this.match = match; this.screenPhase = null;
-    this.elements = Object.fromEntries(['home-score', 'away-score', 'quarter', 'game-clock', 'play-clock', 'down-distance', 'ball-spot', 'possession', 'state-label', 'play-notice', 'play-result', 'player-label', 'position-label', 'juke-label', 'snap', 'field-goal', 'punt', 'match-screen', 'screen-eyebrow', 'screen-title', 'screen-copy', 'screen-summary', 'screen-action', 'match-options'].map(id => [id, document.getElementById(id)]));
+    this.elements = Object.fromEntries(['home-score', 'away-score', 'quarter', 'game-clock', 'play-clock', 'down-distance', 'ball-spot', 'possession', 'state-label', 'play-notice', 'play-result', 'player-label', 'position-label', 'juke-label', 'snap', 'field-goal', 'punt', 'match-screen', 'screen-eyebrow', 'screen-title', 'screen-copy', 'screen-summary', 'screen-action', 'match-options', 'home-team', 'away-team', 'home-timeouts', 'away-timeouts', 'home-timeout-status', 'away-timeout-status', 'home-score-change', 'away-score-change', 'timeout-count', 'clock-event', 'scoreboard-announcement'].map(id => [id, document.getElementById(id)]));
+    this.scoreboard = document.querySelector('.match-scoreboard');
+    this.clockPanel = document.querySelector('.score-time'); this.playClockPanel = document.querySelector('.play-clock-label');
+    this.scoreboardState = null; this.clockMilestones = new Set();
+    this.scoreboard.addEventListener('animationend', event => {
+      if (event.animationName === 'score-lift') event.target.closest('.score-team')?.classList.remove('score-updated');
+      if (event.animationName === 'clock-mark') this.clockPanel.classList.remove('clock-cued');
+      if (event.animationName === 'play-clock-mark') this.playClockPanel.classList.remove('play-clock-cued');
+    });
   }
   text(id, value) { const el = this.elements[id]; if (el.textContent !== String(value)) el.textContent = value; }
+  cue(element, className, counter) {
+    // Restart only for a new match event, never for an ordinary render frame.
+    if (element.classList.contains(className)) { element.classList.remove(className); void element.offsetWidth; }
+    element.classList.add(className);
+    element.dataset[counter] = String(Number(element.dataset[counter] || 0) + 1);
+  }
+  clearScoreboardCues() {
+    for (const team of ['home', 'away']) this.elements[`${team}-team`].classList.remove('score-updated');
+    this.clockPanel.classList.remove('clock-cued'); this.playClockPanel.classList.remove('play-clock-cued');
+  }
+  updateScoreboard(r, paused, playClockActive) {
+    const e = this.elements, previous = this.scoreboardState;
+    const current = { home: r.score.home, away: r.score.away, score: r.score, quarter: r.quarter, phase: r.phase,
+      clock: r.clock, playClock: r.playClock, playClockActive, playNumber: r.playNumber, possession: r.possession,
+      homeTimeouts: r.timeouts.home, awayTimeouts: r.timeouts.away, homeName: r.teams.home, awayName: r.teams.away };
+    // Rules replaces its score object on reset; identity catches a new 0–0 game
+    // even if both the previous and new match happen to be in the same quarter.
+    const reset = !previous || previous.score !== current.score || current.home < previous.home || current.away < previous.away
+      || current.quarter < previous.quarter || current.playNumber < previous.playNumber
+      || current.homeName !== previous.homeName || current.awayName !== previous.awayName;
+    this.scoreboard.classList.toggle('hud-paused', !!paused);
+    e['play-clock'].classList.toggle('urgent', playClockActive && r.playClock <= 5);
+    this.clockPanel.classList.toggle('clock-low', r.clock > 0 && r.clock <= 30 && !['pregame', 'halftime', 'final', 'quarterBreak'].includes(r.phase));
+    this.text('timeout-count', `TIMEOUTS YOU ${r.timeouts.home} / CPU ${r.timeouts.away}`);
+    for (const team of ['home', 'away']) {
+      const count = r.timeouts[team], status = e[`${team}-timeout-status`];
+      this.text(`${team}-timeouts`, count);
+      const label = `${r.teams[team]}: ${count} timeout${count === 1 ? '' : 's'} remaining`;
+      if (status.getAttribute('aria-label') !== label) status.setAttribute('aria-label', label);
+      status.querySelectorAll('.timeout-dot').forEach((dot, index) => dot.classList.toggle('available', index < count));
+      e[`${team}-team`].classList.toggle('has-ball', r.possession === team);
+    }
+    e.possession.dataset.team = r.possession; e.possession.title = `${r.teams[r.possession]} has possession`;
+    const announcements = [];
+    if (reset) {
+      this.clearScoreboardCues(); this.clockMilestones.clear(); this.text('clock-event', ''); this.text('scoreboard-announcement', '');
+    } else {
+      // Reduced-motion cues remain static until the next snap; all other cues
+      // clean themselves up through animationend, and pause freezes both.
+      if (current.playNumber !== previous.playNumber) this.clearScoreboardCues();
+      for (const team of ['home', 'away']) {
+        const points = current[team] - previous[team];
+        if (points > 0) {
+          this.text(`${team}-score-change`, `+${points}`); this.cue(e[`${team}-team`], 'score-updated', 'scoreEvents');
+          announcements.push(`${r.teams[team]} scores ${points}. Score: ${r.teams.home} ${r.score.home}, ${r.teams.away} ${r.score.away}.`);
+        }
+        if (current[`${team}Timeouts`] < previous[`${team}Timeouts`]) announcements.push(`${r.teams[team]} timeout. ${r.timeouts[team]} remaining.`);
+      }
+      if (current.possession !== previous.possession) announcements.push(`${r.teams[r.possession]} has possession.`);
+      if (r.phase === 'halftime' && previous.phase !== 'halftime') announcements.push('Halftime. Three timeouts per team for the second half.');
+      let clockEvent = '';
+      if (current.quarter !== previous.quarter) clockEvent = r.phase === 'quarterBreak' ? `END Q${r.breakQuarter}` : `QUARTER ${r.quarter}`;
+      if (current.phase !== previous.phase && ['halftime', 'final'].includes(r.phase)) clockEvent = r.phase === 'halftime' ? 'HALFTIME' : 'FINAL';
+      for (const seconds of [30, 10, 0]) {
+        const key = `${r.quarter}:${seconds}`;
+        if (current.quarter === previous.quarter && previous.clock > seconds && r.clock <= seconds && !this.clockMilestones.has(key)) {
+          this.clockMilestones.add(key); clockEvent = seconds === 0 ? 'TIME EXPIRED' : `${seconds} SECONDS`;
+        }
+      }
+      if (clockEvent) { this.text('clock-event', clockEvent); this.cue(this.clockPanel, 'clock-cued', 'clockEvents'); announcements.push(clockEvent.toLowerCase() + '.'); }
+      if (playClockActive && r.playClock <= 5 && previous.playClock > 5) this.cue(this.playClockPanel, 'play-clock-cued', 'clockEvents');
+      if (announcements.length) this.text('scoreboard-announcement', announcements.join(' '));
+    }
+    this.scoreboardState = current;
+  }
   update(paused) {
     const r = this.match.rules, p = this.match.play, e = this.elements;
     this.text('home-score', r.score.home); this.text('away-score', r.score.away);
     this.text('quarter', r.phase === 'final' ? 'FINAL' : r.phase === 'halftime' ? 'HALF' : `Q${r.quarter}`);
     this.text('game-clock', formatClock(r.clock));
-    this.text('play-clock', (r.phase === 'ready' || (r.phase === 'result' && !r.next && !r.kickoffPending && r.clock > 0)) ? Math.ceil(r.playClock) : '—');
-    e['play-clock'].classList.toggle('urgent', r.playClock <= 5);
+    const playClockActive = r.phase === 'ready' || (r.phase === 'result' && !r.next && !r.kickoffPending && r.clock > 0);
+    this.text('play-clock', playClockActive ? Math.ceil(r.playClock) : '—');
     this.text('down-distance', r.phase === 'extraPoint' || r.kick?.kind === 'extraPoint' ? 'PAT' : ['kickoff','return'].includes(r.phase) || (r.phase === 'kickMeter' && this.match.meter?.kind === 'kickoff') ? 'KICKOFF' : r.downLabel);
     this.text('ball-spot', r.spotLabel); this.text('possession', `${r.teams[r.possession]} BALL →`);
-    document.getElementById('home-team').classList.toggle('has-ball', r.possession === 'home');
-    document.getElementById('away-team').classList.toggle('has-ball', r.possession === 'away');
+    this.updateScoreboard(r, paused, playClockActive);
     this.text('state-label', paused ? 'GAME PAUSED' : p.phase === 'loose' ? 'FUMBLE / BALL LOOSE' : `${names[r.phase]}${!this.match.humanTurn && ['ready', 'live', 'kick'].includes(r.phase) ? ' · CPU' : ''}`);
     let notice = r.detail;
     if (r.phase === 'ready') notice = this.match.humanTurn ? `${p.call?.name || 'Offense'} · Q / E audible · SPACE snap · Play clock keeps running` : `${r.teams.away} is calling a play. Watch your defense work.`;
@@ -37,6 +109,7 @@ export class GameHUD {
     if (r.phase === 'halftime') notice = `HALFTIME / Clocks stopped / ${r.teams.away} receives to start the third quarter.`;
     if (r.phase === 'quarterBreak') notice = `END OF QUARTER ${r.breakQuarter} · Possession and downs carry into the next quarter.`;
     if (r.phase === 'final') notice = `FINAL · ${r.teams.home} ${r.score.home} — ${r.score.away} ${r.teams.away} · Start a new game to play again.`;
+    if (r.phase === 'ready' && r.detail.includes(' timeout.')) notice = r.detail;
     this.text('play-notice', notice);
     e['play-result'].hidden = r.phase !== 'result'; this.text('play-result', r.result);
     document.querySelector('.line-legend').hidden = !!p.isKickoff;
