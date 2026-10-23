@@ -7,20 +7,28 @@ import {Play} from '../src/football/Play.js';
 import {Field} from '../src/world/Field.js';
 import {MatchRules} from '../src/game/MatchRules.js';
 const memory=()=>({value:null,getItem(){return this.value},setItem(k,v){this.value=v}});
-test('24 unique fictional clubs have complete, deterministic 53-player rosters',()=>{
- const league=createLeague(), names=new Set(),ids=new Set();assert.equal(league.length,24);
- assert.deepEqual(league,createLeague());assert.equal(new Set(TEAMS.map(t=>t.name)).size,24);
+test('32 unique NFL teams have complete, deterministic 53-player rosters',()=>{
+ const league=createLeague(), names=new Set(),ids=new Set();assert.equal(league.length,32);
+ assert.deepEqual(league,createLeague());assert.equal(new Set(TEAMS.map(t=>t.name)).size,32);
+ assert.equal(new Set(TEAMS.map(t=>t.abbreviation)).size,32);
+ assert.deepEqual(TEAMS.map(t=>`${t.city} ${t.name}`), [
+  'Arizona Cardinals','Atlanta Falcons','Baltimore Ravens','Buffalo Bills','Carolina Panthers','Chicago Bears','Cincinnati Bengals','Cleveland Browns',
+  'Dallas Cowboys','Denver Broncos','Detroit Lions','Green Bay Packers','Houston Texans','Indianapolis Colts','Jacksonville Jaguars','Kansas City Chiefs',
+  'Las Vegas Raiders','Los Angeles Chargers','Los Angeles Rams','Miami Dolphins','Minnesota Vikings','New England Patriots','New Orleans Saints','New York Giants',
+  'New York Jets','Philadelphia Eagles','Pittsburgh Steelers','San Francisco 49ers','Seattle Seahawks','Tampa Bay Buccaneers','Tennessee Titans','Washington Commanders',
+ ]);
+ for(const conference of ['AFC','NFC'])for(const division of ['East','North','South','West'])assert.equal(TEAMS.filter(t=>t.conference===conference&&t.division===division).length,4);
  for(const t of league){
   for(const key of ['city','name','stadium','offensiveIdentity','defensiveIdentity'])assert.ok(t[key]);
   assert.match(t.primaryColor,/^#[0-9a-f]{6}$/i);assert.match(t.secondaryColor,/^#[0-9a-f]{6}$/i);
   assert.equal(t.roster.length,53);assert.equal(new Set(t.roster.map(p=>p.number)).size,53);
   for(const [specialty,count] of Object.entries({QB:3,RB:4,WR:6,TE:3,OL:9,DL:8,LB:7,DB:10,K:1,P:1,LS:1}))assert.equal(t.roster.filter(p=>p.specialty===specialty).length,count);
   for(const p of t.roster){ids.add(p.id);names.add(p.name);assert.equal(p.teamId,t.id);assert.ok(p.overall<=p.potential&&p.potential<=99);assert.ok(p.age>=21&&p.age<=34);assert.ok(p.contract.annualSalary>0);assert.ok(Object.values(p.ratings).every(n=>Number.isInteger(n)&&n>=1&&n<=99));assert.deepEqual(PlayerData.fromJSON(JSON.stringify(p)),p);}
- }assert.equal(ids.size,1272);assert.equal(names.size,1272);
+ }assert.equal(ids.size,1696);assert.equal(names.size,1696);
 });
 test('all clubs bind actual starters on either possession without losing identities',()=>{
  const league=createLeague();for(let i=0;i<league.length;i++){
- const home=league[i],away=league[(i+1)%24],play=new Play(new Field(),()=>.4,{home:home.roster,away:away.roster});
+ const home=league[i],away=league[(i+1)%league.length],play=new Play(new Field(),()=>.4,{home:home.roster,away:away.roster});
  for(const side of ['home','away']){play.configure(25,side);const offense=side==='home'?home:away,defense=side==='home'?away:home;assert.equal(play.qb.data,offense.roster.find(p=>p.specialty==='QB'));assert.equal(play.rb.data,offense.roster.find(p=>p.specialty==='RB'));for(const d of play.defenders)assert.equal(d.data.teamId,defense.id);assert.ok(play.linemen.every(p=>p.data.teamId===offense.id));}
  }
 });

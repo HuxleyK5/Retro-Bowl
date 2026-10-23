@@ -1,4 +1,5 @@
 import { chromium, expect } from '@playwright/test';
+import { startFranchise } from './start-helper.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
@@ -11,7 +12,7 @@ try {
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   await page.goto('http://127.0.0.1:5173');
-  await page.locator('#start-franchise').click();
+  await startFranchise(page);
   const render = () => page.evaluate(async () => (await import('/src/main.js')).loop.render());
   const layout = () => page.evaluate(async () => {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));

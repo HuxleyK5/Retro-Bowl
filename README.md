@@ -1,33 +1,43 @@
 # Pocket Field — Phase 6
 
-A retro football franchise game with complete four-quarter matches and a twelve-play offensive playbook. Build one of 24 clubs across multiple seasons, manage real player careers and contracts, and chase the championship. You control your club's offense; opponents use the same passing, catching, running and defensive AI.
+A retro football franchise game with complete four-quarter matches and a twelve-play offensive playbook. Build one of 32 NFL teams across multiple seasons, manage generated player careers and contracts, and chase the championship. You control your club's offense; opponents use the same passing, catching, running and defensive AI.
 
 ## Run
 
-Run `npm start` and open http://localhost:5173. Node.js is required. There are no runtime dependencies or build steps. Choose a club and click **Start Franchise**, then select a quarter length and click **Start Game**. **Franchise Hub** opens management before kickoff or pauses an ongoing game. **Continue Saved Club** restores your franchise at its hub.
+To play from another computer on the same network, keep `npm start` running on this computer and open the network address printed in the terminal (for example, `http://10.1.1.164:5173`) on the other computer. The server listens on port 5173 on all IPv4 interfaces. Each browser keeps its own saved franchise.
 
-## Fictional league (Phase 6)
+Run `npm start` and open http://localhost:5173. Node.js is required. There are no runtime dependencies or build steps. Choose a club and click **Start Franchise** to enter the opening draft. Make your two rookie picks and click **Start Season** (unused picks are chosen automatically). Then choose **Play Game**, select a quarter length, and click **Start Game**. **Franchise Hub** opens management before kickoff or pauses an ongoing game. **Continue Saved Club** restores your franchise, including a draft in progress.
 
-The Continental Gridiron League has 24 original clubs, each with a city, nickname, two colors, stadium, and offensive/defensive identity. Select any club to see its full roster, overall ratings, ages, potential, annual salaries, remaining contract years, and guaranteed money. Actual club names, uniforms, stadium labels, player names, ratings, and special-team specialists carry into the game. The next club in league order is the opening opponent.
+## Beginner help
 
-Each initial 53-player roster has 3 QB, 4 RB, 6 WR, 3 TE, 9 OL, 8 DL, 7 LB, 10 DB, a kicker, a punter, and a long snapper. All 1,272 players have distinct rating profiles and position strengths. `position` is the rating/gameplay group; `specialty` is the depth position (TE uses WR ratings, DL/LB/DB use DEF, LS uses OL). The arcade field lineup remains 11 offensive and 8 defensive entities, selected from healthy depth using effective abilities. Fatigue lowers actual movement and execution ratings without changing permanent skills.
+**Beginner help** is on by default and remembers your choice in this browser. The **How to play** guide explains scoring, four tries to gain ten yards, passing, and running. During a game, the coach explains your next step and suggests a play or kick. Start with **Short pass**, **Run through the middle**, or **Long pass**; **More plays** and **More football options** reveal the full controls. You can turn Beginner help off at any time without restarting your game.
+
+Team and draft screens explain player positions, star ratings, and the annual spending limit. Detailed league tables, player ratings, contracts, and trades remain available in expandable sections. Beginner help changes the interface and instructions; the same match rules and player abilities apply.
+
+## NFL teams
+
+Choose from all 32 NFL teams, with their cities, names, abbreviations, team colors, home stadiums, conferences and divisions. Player names, ratings, contracts and careers are generated for the game; these are not current NFL player rosters. Select any club to see its full roster, overall ratings, ages, potential, annual salaries, remaining contract years, and guaranteed money. Actual club names, uniforms, stadium labels, player names, ratings, and special-team specialists carry into the game. The next club in league order is the opening opponent.
+
+Each initial 53-player roster has 3 QB, 4 RB, 6 WR, 3 TE, 9 OL, 8 DL, 7 LB, 10 DB, a kicker, a punter, and a long snapper. All 1,696 players have distinct rating profiles and position strengths. `position` is the rating/gameplay group; `specialty` is the depth position (TE uses WR ratings, DL/LB/DB use DEF, LS uses OL). The arcade field lineup remains 11 offensive and 8 defensive entities, selected from healthy depth using effective abilities. Fatigue lowers actual movement and execution ratings without changing permanent skills.
 
 - `src/data/League.js`: club catalog and deterministic full roster generation.
 - `src/data/PlayerData.js`: validated persistent player records; optional metadata defaults preserve older records.
 - `src/data/Franchise.js`: versioned browser snapshot, validation, and safe recovery from corrupt or unavailable storage.
 - `src/ui/TeamSelection.js`: club picker and complete roster preview.
 
-**Continue Saved Club** restores season progress, player careers, transactions, markets, and championship history. **Start Franchise** starts fresh and replaces the saved franchise. **League / New Franchise** returns to selection. Unfinished matches restart at kickoff after a reload; completed results are saved once, including all CPU games that week. Older roster-only saves migrate into a new season, and malformed saves recover safely.
+**Continue Saved Club** restores season progress, player careers, transactions, markets, and championship history. **Start Franchise** starts fresh and replaces the saved franchise. **League / New Franchise** returns to selection. Unfinished matches restart at kickoff after a reload; completed results are saved once, including all CPU games that week. Older roster-only saves migrate into a new season, and malformed saves recover safely. Existing 24-team saves keep their current season and player progress, use NFL team identities, and expand to all 32 teams when the next season starts.
 
 ## Franchise mode
 
-The **Overview** shows the 12-week schedule, all 24 clubs' standings, results, championship history, and an eight-team playoff bracket. Play your game or simulate the full week. Wins, losses and ties determine seeds, followed by head-to-head results, point differential, points scored, and club ID. Playoff winners advance through quarterfinals, semifinals and a championship. Tied playoff games resolve in simulated overtime; regular-season ties stand.
+The **Overview** shows the 12-week schedule, all 32 NFL teams' standings, results, championship history, and an eight-team playoff bracket. Play your game or simulate the full week. Wins, losses and ties determine seeds, followed by head-to-head results, point differential, points scored, and club ID. Playoff winners advance through quarterfinals, semifinals and a championship. Tied playoff games resolve in simulated overtime; regular-season ties stand.
 
 The **Roster** shows ratings, strengths, potential, age, fatigue, injuries and contracts. Train a player once per week in a position skill or balanced development; training raises a rating and adds fatigue. Starters earn experience through games, and experience improves skills toward potential. Use the weekly team recovery session to reduce fatigue. Injuries keep players out for one or more games, healthy backups take over automatically, and minimum-salary emergency players fill necessary depth when cap space permits. Players develop, age, decline and retire in the offseason.
 
 The **Market & trades** tab offers free agents, player-for-player trades, contract renewals and releases. Salary quotes appear before signing. Both clubs must keep playable depth and fit under the salary cap; CPU clubs can decline uneven trades. The starting cap is **$260M**, increasing $5M per season. Guaranteed contracts can leave dead money after release. Rosters can hold up to 75 players, and an over-cap team must clear room before playing. CPU clubs renew useful players and acquire replacements over successive seasons.
 
-After the championship, contracts lose a year and expiring players enter free agency. The **Draft** offers two rounds in reverse regular-season standings order, with CPU clubs making their picks between yours. Rookies sign three-year contracts. **Start Next Season** fills unused picks automatically and resets standings while preserving rosters and championship history. Roster moves and week advancement are locked during an unfinished match; the hub can still be browsed and the game resumed.
+Every season begins with a two-round rookie **Draft**, including the first season of a new franchise. The blue draft screen shows ten player cards per page, with original pixel portraits, position names, stars and yearly prices. Use the page arrows to browse. Select a card to see the player's role and full three-year cost, then press **Draft Player** to confirm. Selecting or browsing cards never spends a pick. The budget bar and picks counter update after each signing; unaffordable signings are disabled. **My Team** opens your roster, and **Auto-pick & Start** chooses any remaining players for you. Stars measure current ability: 50 overall earns one star, every five overall adds half a star, and 90+ earns five stars. The opening draft gives your club the first pick; later drafts follow reverse regular-season standings, with CPU clubs selecting between your picks.
+
+After the championship, contracts lose a year and expiring players enter free agency, then the next season's draft opens automatically. **Start Season** resets standings while preserving rosters and championship history. Confirmed draft picks autosave. Roster moves and week advancement are locked during an unfinished match; the hub can still be browsed and the game resumed.
 
 - `src/data/FranchiseMode.js`: schedule, standings, playoffs, transactions, cap, CPU roster management and offseason.
 - `src/data/PlayerLifecycle.js`: healthy depth, fatigue, training, experience, injuries, development and aging.
@@ -68,7 +78,7 @@ Click the field to focus keyboard controls. Window focus loss and hidden tabs pa
 
 ## Player ratings (Phase 5)
 
-Every player has a stable ID, name, jersey number, team, position and validated **1–99 ratings**. The league contains 24 complete 53-player rosters; the active matchup uses those persistent player records. Open **Roster / Ratings** in the control bar to inspect the ratings for each position and derived movement or arm abilities. Inspection pauses both clocks and live action. Overall is a display-only average; individual ratings drive gameplay.
+Every player has a stable ID, name, jersey number, team, position and validated **1–99 ratings**. The league contains 32 complete 53-player rosters; the active matchup uses those persistent player records. Open **Roster / Ratings** in the control bar to inspect the ratings for each position and derived movement or arm abilities. Inspection pauses both clocks and live action. Overall is a display-only average; individual ratings drive gameplay.
 
 | Position | Ratings and gameplay effects |
 | --- | --- |
@@ -206,3 +216,5 @@ Choose **F** for a field goal, **K** for a punt, or **Space** for an extra point
 After a successful field goal or any extra-point attempt, continue to the kickoff. Your team's kickoffs also use the meter. Short kicks allow returns; deep kicks reaching the end zone produce touchbacks. Opening and CPU kickoffs are automatic. The returner catches and runs immediately; **WASD/arrows** steer, **Shift** sprints, and **J** jukes. A tackle or sideline exit sets up first down at the return spot; a return touchdown scores six and leads to a PAT. CPU returns use the existing runner AI. Punt returns, onside kicks, fair catches and selectable end-zone returns are not included.
 
 `KickMeter.js` holds timing and kick formulas; `KickoffReturn.js` manages the kick flight and return setup; `KickMeterPanel.js` draws the timing controls. Tests cover meters, missed/made kicks, opening/halftime/scoring kickoffs, return outcomes, touchbacks, quarter-end scoring, and actual browser controls.
+
+Team metadata references: [NFL team directory](https://www.nfl.com/teams/), [Houston Texans stadium](https://www.houstontexans.com/stadium/), [Kansas City Chiefs schedule](https://www.chiefs.com/schedule/), [Washington Commanders stadium](https://www.commanders.com/stadium/game-day).

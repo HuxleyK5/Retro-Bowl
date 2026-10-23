@@ -10,8 +10,11 @@ export function saveFranchise(storage, league, teamId, mode = null) {
 export function loadFranchise(storage) {
   try {
     const value=JSON.parse(storage.getItem(KEY));
-    const league=createLeague();
-    if(![1,2].includes(value?.version) || !league.some(t=>t.id===value.teamId) || !Array.isArray(value.rosters) || value.rosters.length!==24 || new Set(value.rosters.map(r=>r.id)).size!==24) return null;
+    let league=createLeague();
+    if(![1,2].includes(value?.version) || !Array.isArray(value.rosters)) return null;
+    // Keep a saved 24-team season intact; it expands when the next season starts.
+    if(value.rosters.length===24) league=league.slice(0,24);
+    if(!league.some(t=>t.id===value.teamId) || value.rosters.length!==league.length || new Set(value.rosters.map(r=>r.id)).size!==league.length) return null;
     const ids=new Set();
     for(const team of league) {
       const records=value.rosters.find(r=>r.id===team.id)?.players;

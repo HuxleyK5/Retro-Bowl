@@ -1,4 +1,5 @@
 import { pullPass } from './pull-helper.mjs';
+import { startFranchise } from './start-helper.mjs';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { expect } from '@playwright/test';
@@ -11,10 +12,10 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', e => { if (e.type() === 'error') errors.push(e.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  await page.goto('http://localhost:5173'); await page.locator('#start-franchise').click(); await page.locator('#screen-action').click(); await page.evaluate(async()=>{(await import('/src/main.js')).match.start(120,false)});
+  await page.goto('http://localhost:5173'); await startFranchise(page); await page.locator('#screen-action').click(); await page.evaluate(async()=>{(await import('/src/main.js')).match.start(120,false)});
   const read = () => page.evaluate(async () => {
     const { play, match } = await import('/src/main.js');
-    return { id: play.call?.id, phase: match.rules.phase, playPhase: play.phase, elapsed: play.elapsed, carrier: play.carrier?.number, canThrow: play.canThrow, clock: match.rules.clock, playClock: match.rules.playClock, down: match.rules.down, spot: match.rules.spot, routes: play.receivers.map(p => p.route), rb: { x: play.rb.x, y: play.rb.y }, guided: play.execution.guided };
+    return { id: play.call?.id, phase: match.rules.phase, playPhase: play.phase, elapsed: play.elapsed, carrierId: play.carrier?.data.id, qbId: play.qb.data.id, rbId: play.rb.data.id, canThrow: play.canThrow, clock: match.rules.clock, playClock: match.rules.playClock, down: match.rules.down, spot: match.rules.spot, routes: play.receivers.map(p => p.route), rb: { x: play.rb.x, y: play.rb.y }, guided: play.execution.guided };
   });
   const waitFor = async (condition, timeout = 3000) => {
     const until = Date.now() + timeout;
@@ -47,7 +48,7 @@ try {
   for (const id of ['inside','outside','sweep','draw']) {
     await prepare(); await page.locator(`[data-play="${id}"]`).click();
     await page.locator('#playbook-snap').click(); await expect(page.locator('#playbook')).toBeHidden();
-    await waitFor(v => v.carrier === '04');
+    await waitFor(v => v.carrierId === v.rbId);
     assert.equal((await read()).playPhase, 'running'); assert.equal((await read()).canThrow, false);
     await page.keyboard.press('e'); assert.equal((await read()).id, id);
     if (id === 'outside') {
@@ -57,17 +58,17 @@ try {
     }
   }
   await prepare(); await page.locator('[data-play="play-action"]').click(); await page.keyboard.press('Space');
-  assert.equal((await read()).canThrow, false); await waitFor(v => v.canThrow); assert.equal((await read()).carrier, '01');
+  assert.equal((await read()).canThrow, false); const afterFake = await waitFor(v => v.canThrow); assert.equal(afterFake.carrierId, afterFake.qbId);
   await prepare(); await page.locator('[data-play="screen"]').click(); await page.keyboard.press('Space');
   await page.waitForTimeout(1000);
   const target = await page.evaluate(async () => { const {play}=await import('/src/main.js');return {x:play.rb.x,y:play.rb.y}; });
-  await pullPass(page,target); await waitFor(v => v.playPhase === 'running'); assert.equal((await read()).carrier, '04');
+  await pullPass(page,target); const afterCatch = await waitFor(v => v.playPhase === 'running'); assert.equal(afterCatch.carrierId, afterCatch.rbId);
   for (const [width,height] of [[960,720],[540,800]]) {
     await prepare(); await page.setViewportSize({width,height}); await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.locator('[data-play="sweep"]').click(); assert.equal((await read()).id,'sweep');
     await page.screenshot({path:`test-results/phase4-playbook-${width}.png`,fullPage:true});
-    await page.locator('#playbook-snap').click(); await waitFor(v => v.carrier === '04');
+    await page.locator('#playbook-snap').click(); await waitFor(v => v.carrierId === v.rbId);
   }
   await prepare();
   await page.evaluate(async () => {const {match} = await import('/src/main.js'); match.rules.changePossession(25); match.prepare();});

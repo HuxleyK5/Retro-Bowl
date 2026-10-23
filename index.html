@@ -6,7 +6,11 @@
   <meta name="theme-color" content="#111b1b">
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="scoreboard.css">
+  <link rel="stylesheet" href="field-readability.css">
+  <link rel="stylesheet" href="playbook.css">
   <link rel="stylesheet" href="franchise.css">
+  <link rel="stylesheet" href="draft-cards.css">
   <link rel="stylesheet" href="strategy.css">
   <title>Pocket Field · Match Day</title>
 </head>
@@ -14,16 +18,26 @@
   <main class="app">
     <header class="masthead">
       <a class="brand" href="./" aria-label="Pocket Field home"><span class="brand-mark">PF</span> POCKET FIELD<span class="edition">FOOTBALL CLUB / EST. 2026</span></a>
-      <span class="build"><i></i> FICTIONAL LEAGUE <b>06</b></span>
+      <span class="build"><i></i> NFL TEAMS <b>32</b></span>
     </header>
-    <section class="heading"><div><p class="eyebrow">SATURDAY UNDER THE LIGHTS</p><h1>Make every down count<span>.</span></h1><p class="intro">A new league. A club of your own.</p></div><div class="session"><span class="status-dot"></span><div>CONTINENTAL GRIDIRON<small>24 CLUBS / 1,272 PLAYERS</small></div></div></section>
+    <section class="heading"><div><p class="eyebrow">SATURDAY UNDER THE LIGHTS</p><h1>Your team. Your game<span>.</span></h1><p class="intro">Pick a team. Learn as you play.</p></div><div class="session"><span class="status-dot"></span><div>NATIONAL FOOTBALL LEAGUE<small>32 TEAMS / 1,696 PLAYERS</small></div></div></section>
+    <div class="beginner-settings">
+      <label class="beginner-switch"><input id="beginner-mode" type="checkbox" checked><span>Beginner help<small>Simple choices and tips as you play</small></span></label>
+      <details id="football-basics" class="beginner-basics"><summary>How to play</summary><div class="beginner-basics-copy">
+        <h2>Your first game</h2>
+        <p><strong>Move the ball to the right.</strong> Reach the far end of the field for a touchdown, worth 6 points. Your defense plays automatically when the other team has the ball.</p>
+        <ol><li><strong>Choose a play.</strong> Start with a short pass or a run. Press Space to start the play.</li><li><strong>Throw or run.</strong> To pass, hold the mouse on the field, pull back opposite the direction you want to throw, then release. After a catch or handoff, your runner moves forward automatically. Use WASD or arrow keys to steer.</li><li><strong>Reach the yellow line.</strong> You get four tries to gain 10 yards. Reach the yellow line to earn four new tries. On your last try, you can also kick for 3 points or kick the ball far away to give the other team a longer trip.</li></ol>
+        <p>A <strong>down</strong> means a try. A <strong>quarter</strong> is one of four parts of the game. A <strong>field goal</strong> is a kick worth 3 points; an <strong>extra point</strong> is a kick worth 1 after a touchdown. Press Escape to pause whenever you need a break.</p>
+        <p>Opening this guide during a game pauses play. Close the guide and press Resume when you are ready.</p>
+      </div></details>
+    </div>
     <section id="league-screen" class="league-screen" aria-labelledby="league-name">
-      <p class="eyebrow">24 CLUBS / YOUR NEXT CHAPTER</p><h2 id="league-name"></h2>
-      <p>Choose your club. Every roster is fictional; every rating matters on the field.</p>
+      <p class="eyebrow">32 NFL TEAMS / YOUR NEXT CHAPTER</p><h2 id="league-name"></h2>
+      <p>Choose your favorite NFL team. Pick two new players, then start your first game. Player rosters are generated for this game.</p>
       <div id="team-grid" class="team-grid" aria-label="Choose a franchise team"></div>
       <div class="club-detail"><h3 id="selected-club"></h3><p id="club-details"></p><p id="club-summary"></p>
         <button id="start-franchise" type="button">START FRANCHISE</button> <button id="continue-franchise" type="button" hidden>CONTINUE SAVED CLUB</button>
-        <p id="save-status" role="status">Build your roster, play a 12-week season, and chase the championship. Seasons and roster moves autosave in this browser. Unfinished games restart at kickoff. Starting a new franchise replaces your save.</p>
+        <p id="save-status" role="status">Pick new players before each season, or let the game choose your remaining picks with Start Season. Your progress saves automatically in this browser. Unfinished games restart from the beginning after a reload. Starting a new franchise replaces your save.</p>
         <details><summary>EXPLORE ALL 53 PLAYERS</summary><div class="roster-scroll"><table class="club-table"><thead><tr><th>PLAYER</th><th>POS</th><th>AGE</th><th>OVR</th><th>POT</th><th>CONTRACT / YEAR</th><th>GUARANTEED</th></tr></thead><tbody id="club-roster"></tbody></table></div></details>
       </div>
     </section>
@@ -49,6 +63,7 @@
         <label for="stadium-lighting">LIGHTING <select id="stadium-lighting"><option value="auto">Day / night cycle</option><option value="day">Day</option><option value="dusk">Dusk</option><option value="night">Night</option></select></label>
         <button id="sound-toggle" type="button" aria-pressed="false" aria-label="Enable stadium sound">SOUND OFF</button>
       </div>
+      <section id="beginner-coach" class="beginner-coach" aria-label="Coach tips" hidden><div><p class="beginner-coach-label">YOUR NEXT STEP</p><h2 id="beginner-goal"></h2><p id="beginner-tip"></p></div><p id="beginner-recommendation"></p></section>
       <section id="strategy-panel" hidden></section>
       <div class="play-stage" id="play-stage">
       <aside class="playbook" id="playbook" aria-label="Offensive play selection" hidden>
@@ -66,15 +81,15 @@
         <section id="kick-meter" class="kick-meter" aria-label="Kick timing meter" hidden><strong id="kick-meter-title"></strong><p id="kick-meter-help"></p><div id="kick-track"><span id="kick-needle"></span></div><button id="kick-lock" type="button">SPACE / LOCK POWER</button><small>Two presses: power, then accuracy. Each stage times out after 5 seconds.</small></section>
         <div class="camera-label" id="juke-label">JUKE READY</div>
         <div id="play-result" class="play-result" role="status" hidden></div>
-        <div class="match-screen" id="match-screen"><div class="match-card"><p class="eyebrow" id="screen-eyebrow">NORTHSIDE vs EASTBANK</p><h2 id="screen-title">Four quarters. Your game.</h2><p id="screen-copy">You run Northside’s offense. Eastbank plays automatically.</p><div id="match-options"><label for="quarter-length">QUARTER LENGTH</label><select id="quarter-length"><option value="60">1 minute · Quick game</option><option value="120" selected>2 minutes · Arcade</option><option value="300">5 minutes</option><option value="900">15 minutes · Regulation</option></select><small>Return kickoffs. Offense always attacks right.<br>Four-quarter regulation game; ties stand.</small></div><div id="screen-summary" hidden></div><button id="screen-action" type="button">START GAME →</button></div></div>
+        <div class="match-screen" id="match-screen"><div class="match-card"><p class="eyebrow" id="screen-eyebrow">NORTHSIDE vs EASTBANK</p><h2 id="screen-title">Four quarters. Your game.</h2><p id="screen-copy">You run Northside’s offense. Eastbank plays automatically.</p><div id="match-options"><label for="quarter-length">LENGTH OF EACH QUARTER (4 PARTS)</label><select id="quarter-length"><option value="60">1 minute · Quick game</option><option value="120" selected>2 minutes · Arcade</option><option value="300">5 minutes</option><option value="900">15 minutes · Regulation</option></select><small data-beginner-only>New here? Try 1 minute per quarter.<br>Move right to score. Your defense plays automatically.</small><small data-expert-only>Return kickoffs. Offense always attacks right.<br>Four-quarter regulation game; ties stand.</small></div><div id="screen-summary" hidden></div><button id="screen-action" type="button">START GAME →</button></div></div>
         <div class="overlay" id="overlay" hidden><div class="pause-card"><p class="eyebrow">TAKE A BREATHER</p><h2>Game paused.</h2><p>Both clocks and the play are frozen.</p><button id="resume" type="button">BACK TO THE FIELD <span>→</span></button><small>OR PRESS ESC / P</small></div></div>
         <div class="field-bottom"><span><i></i> <span id="player-label">01 / QUARTERBACK</span></span><span id="position-label">OWN 25 YD</span></div>
       </div>
       </div>
       <div class="play-status"><span id="play-notice">Choose your quarter length to begin.</span><div class="play-actions"><button id="field-goal" type="button" hidden>F · FIELD GOAL</button><button id="punt" type="button" hidden>K · PUNT</button><button id="snap" type="button" hidden>SNAP BALL →</button></div></div>
-      <div class="controls"><button id="change-club" type="button">LEAGUE / NEW FRANCHISE</button><button id="ratings-toggle" type="button">ROSTER / RATINGS</button><div><kbd>SPACE</kbd><span>Snap / continue</span></div><div><kbd>Q / E</kbd><span>Audible</span></div><div><kbd>MOUSE</kbd><span>Pull to snap + release pass</span></div><div><kbd>WASD / ↑↓←→</kbd><span>Move</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>J</kbd><span>Juke</span></div><div><kbd>H</kbd><span>Handoff</span></div><div><kbd>F / K</kbd><span>FG / punt</span></div></div>
+      <div class="controls"><button id="change-club" type="button">LEAGUE / NEW FRANCHISE</button><button id="ratings-toggle" type="button">ROSTER / RATINGS</button><div><kbd>SPACE</kbd><span>Start play / continue</span></div><div data-expert-only><kbd>Q / E</kbd><span>Audible</span></div><div><kbd>MOUSE</kbd><span>Pull back, release to throw</span></div><div><kbd>WASD / ↑↓←→</kbd><span>Move</span></div><div data-expert-only><kbd>SHIFT</kbd><span>Sprint</span></div><div data-expert-only><kbd>J</kbd><span>Juke</span></div><div data-expert-only><kbd>H</kbd><span>Handoff</span></div><div data-expert-only><kbd>F / K</kbd><span>FG / punt</span></div><details class="beginner-shortcuts" data-beginner-only><summary>More controls</summary><p>Shift: run faster · J: dodge a tackle · H: hand off to a nearby runner · F: kick for 3 points · K: kick the ball away · Q / E: change your play · Escape: pause</p></details></div>
     </section>
-    <footer><span><b>06</b> FICTIONAL LEAGUE<span class="footer-divider">/</span> Pick your call. Read the coverage. Make your move.</span><span>KEYBOARD + MOUSE <span class="status-dot"></span></span></footer>
+    <footer><span><b>32</b> NFL TEAMS<span class="footer-divider">/</span> Pick your call. Read the coverage. Make your move.</span><span>KEYBOARD + MOUSE <span class="status-dot"></span></span></footer>
   </main>
   <section class="ratings-panel" id="ratings-panel" role="dialog" aria-modal="true" aria-labelledby="ratings-title" hidden>
     <div class="ratings-card">

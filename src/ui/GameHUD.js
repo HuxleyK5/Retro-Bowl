@@ -1,5 +1,8 @@
 
 
+import { getBeginnerGuide } from '../game/BeginnerGuide.js';
+import { isBeginnerMode } from './BeginnerMode.js';
+
 export const formatClock = seconds => {
   const value = Math.max(0, Math.ceil(seconds));
   return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
@@ -87,13 +90,22 @@ export class GameHUD {
   }
   update(paused) {
     const r = this.match.rules, p = this.match.play, e = this.elements;
+    const beginner = isBeginnerMode(), guide = beginner ? getBeginnerGuide(this.match) : null;
+    const coach = document.querySelector('#beginner-coach');
+    if (coach) {
+      coach.hidden = !beginner;
+      if (guide) for (const key of ['goal', 'tip', 'recommendation']) {
+        const element = document.getElementById(`beginner-${key}`);
+        if (element && element.textContent !== guide[key]) element.textContent = guide[key];
+      }
+    }
     this.text('home-score', r.score.home); this.text('away-score', r.score.away);
     this.text('quarter', r.phase === 'final' ? 'FINAL' : r.phase === 'halftime' ? 'HALF' : `Q${r.quarter}`);
     this.text('game-clock', formatClock(r.clock));
     const playClockActive = r.phase === 'ready' || (r.phase === 'result' && !r.next && !r.kickoffPending && r.clock > 0);
     this.text('play-clock', playClockActive ? Math.ceil(r.playClock) : '—');
-    this.text('down-distance', r.phase === 'extraPoint' || r.kick?.kind === 'extraPoint' ? 'PAT' : ['kickoff','return'].includes(r.phase) || (r.phase === 'kickMeter' && this.match.meter?.kind === 'kickoff') ? 'KICKOFF' : r.downLabel);
-    this.text('ball-spot', r.spotLabel); this.text('possession', `${r.teams[r.possession]} BALL →`);
+    this.text('down-distance', r.phase === 'extraPoint' || r.kick?.kind === 'extraPoint' ? (beginner ? 'BONUS KICK' : 'PAT') : ['kickoff','return'].includes(r.phase) || (r.phase === 'kickMeter' && this.match.meter?.kind === 'kickoff') ? 'KICKOFF' : beginner ? `TRY ${r.down} OF 4 · ${Math.max(1, Math.ceil(r.yardsToGo - .001))} YD` : r.downLabel);
+    this.text('ball-spot', beginner ? `${Math.ceil(100 - r.spot)} yards to score` : r.spotLabel); this.text('possession', beginner ? `${this.match.humanTurn ? 'YOUR' : 'OPPONENT'} BALL →` : `${r.teams[r.possession]} BALL →`);
     this.updateScoreboard(r, paused, playClockActive);
     this.text('state-label', paused ? 'GAME PAUSED' : p.phase === 'loose' ? 'FUMBLE / BALL LOOSE' : `${names[r.phase]}${!this.match.humanTurn && ['ready', 'live', 'kick'].includes(r.phase) ? ' · CPU' : ''}`);
     let notice = r.detail;
@@ -110,32 +122,46 @@ export class GameHUD {
     if (r.phase === 'quarterBreak') notice = `END OF QUARTER ${r.breakQuarter} · Possession and downs carry into the next quarter.`;
     if (r.phase === 'final') notice = `FINAL · ${r.teams.home} ${r.score.home} — ${r.score.away} ${r.teams.away} · Start a new game to play again.`;
     if (r.phase === 'ready' && r.detail.includes(' timeout.')) notice = r.detail;
+    if (beginner) {
+      if (r.phase === 'ready') notice = this.match.humanTurn ? 'Choose a play, then press Start this play or Space. Start before the play clock reaches 0.' : 'Your defense plays automatically. Watch until your team gets the ball.';
+      else if (r.phase === 'result') notice = `${r.detail} ${this.match.humanTurn ? 'Press Continue or Space.' : 'Opponent plays automatically.'}`;
+      else notice = guide.tip;
+      if (paused) notice = 'Game paused. Press Resume when you are ready.';
+    }
     this.text('play-notice', notice);
     e['play-result'].hidden = r.phase !== 'result'; this.text('play-result', r.result);
     document.querySelector('.line-legend').hidden = !!p.isKickoff;
     this.text('player-label', r.phase === 'kickMeter' ? `YOU / KICKER #${p.qb.number} ${p.qb.data.name}` : `${this.match.humanTurn ? 'YOU' : 'CPU'} / ${p.controlled.number} ${p.controlled.data.name}`);
-    this.text('position-label', `BALL ${r.spotLabel}`);
-    this.text('juke-label', p.phase === 'loose' ? 'RECOVER THE BALL' : !this.match.humanTurn ? 'WATCHING DEFENSE' : p.controlled.jukeCooldown > 0 ? `JUKE ${p.controlled.jukeCooldown.toFixed(1)}s` : 'JUKE READY');
+    this.text('position-label', beginner ? 'MOVE RIGHT TO SCORE →' : `BALL ${r.spotLabel}`);
+    this.text('juke-label', p.phase === 'loose' ? 'RECOVER THE BALL' : !this.match.humanTurn ? 'WATCHING DEFENSE' : p.controlled.jukeCooldown > 0 ? `${beginner ? 'DODGE' : 'JUKE'} ${p.controlled.jukeCooldown.toFixed(1)}s` : beginner ? 'J / DODGE READY' : 'JUKE READY');
     e.snap.hidden = !['ready', 'result', 'extraPoint'].includes(r.phase) || (!this.match.humanTurn && r.phase !== 'result');
     e.snap.disabled = paused;
-    this.text('snap', r.phase === 'result' ? 'CONTINUE →' : r.phase === 'extraPoint' ? 'KICK EXTRA POINT →' : 'SNAP BALL →');
+    this.text('snap', r.phase === 'result' ? 'CONTINUE →' : r.phase === 'extraPoint' ? (beginner ? 'BONUS KICK / 1 POINT →' : 'KICK EXTRA POINT →') : beginner ? 'START PLAY →' : 'SNAP BALL →');
     for (const id of ['field-goal', 'punt']) { e[id].hidden = r.phase !== 'ready' || !this.match.humanTurn; e[id].disabled = paused; }
-    this.text('field-goal', `F / FG ${r.fieldGoalDistance} YD / TIMING METER`);
+    this.text('field-goal', beginner ? `KICK FOR 3 / ${r.fieldGoalDistance} YARDS` : `F / FG ${r.fieldGoalDistance} YD / TIMING METER`);
+    this.text('punt', beginner ? 'KICK AWAY / GIVE UP THE BALL' : 'K · PUNT');
+    e['field-goal'].title = beginner ? 'Field goal: kick through the posts for 3 points. A miss gives the opponent the ball.' : 'F / Field goal';
+    e.punt.title = beginner ? 'Punt: give up the ball and kick it farther away from your end zone. Scores no points.' : 'K / Punt';
+    e['field-goal'].classList.toggle('coach-suggested', beginner && guide.suggestedAction === 'fieldGoal');
+    e.punt.classList.toggle('coach-suggested', beginner && guide.suggestedAction === 'punt');
     this.updateScreen(r, paused);
   }
   updateScreen(r, paused) {
     const e = this.elements;
+    const beginner = isBeginnerMode();
     const show = ['pregame', 'halftime', 'quarterBreak', 'final'].includes(r.phase);
     e['match-screen'].hidden = !show;
     if (!show) { this.screenPhase = null; return; }
     e['screen-action'].disabled = paused;
-    if (this.screenPhase === r.phase) return;
+    if (this.screenPhase === r.phase && this.screenBeginner === beginner) return;
     this.screenPhase = r.phase;
+    this.screenBeginner = beginner;
     e['match-options'].hidden = r.phase !== 'pregame';
     const winner = r.score.home === r.score.away ? 'Tie game.' : r.score.home > r.score.away ? `${r.teams.home} wins.` : `${r.teams.away} wins.`;
     this.text('screen-eyebrow', r.phase === 'pregame' ? `${r.teams.home} vs ${r.teams.away}` : r.phase === 'final' ? 'REGULATION FINAL' : 'TAKE A BREATHER');
     this.text('screen-title', r.phase === 'pregame' ? 'Four quarters. Your game.' : r.phase === 'halftime' ? 'Halftime.' : r.phase === 'final' ? winner : `End of quarter ${r.breakQuarter}.`);
     this.text('screen-copy', r.phase === 'pregame' ? `You run ${r.teams.home}'s offense. ${r.teams.away} plays automatically. Return the opening kickoff, then call your offense.` : r.phase === 'halftime' ? `${r.teams.away} receives the second-half kickoff. You kick after the break.` : r.phase === 'final' ? 'The final whistle. Every yard counted.' : `${r.teams[r.possession]} keeps the ball. ${r.downLabel}, ${r.spotLabel.toLowerCase()}.`);
+    if (beginner) this.text('screen-copy', r.phase === 'pregame' ? 'Run or pass toward the right end zone. Reach the yellow line within 4 tries to earn 4 more. Touchdowns score 6 points; field goal kicks score 3. Your defense plays automatically.' : r.phase === 'halftime' ? 'Two quarters down, two to go. You kick the ball to the other team to start the second half.' : r.phase === 'final' ? 'Return to your team to prepare for the next game.' : `${this.match.humanTurn ? 'Your team keeps' : 'The other team keeps'} the ball. Next is try ${r.down} of 4, with ${Math.max(1, Math.ceil(r.yardsToGo - .001))} yards to the target line.`);
     this.text('screen-action', r.phase === 'pregame' ? 'START GAME →' : r.phase === 'final' ? 'NEW GAME →' : r.phase === 'halftime' ? 'START SECOND HALF →' : 'NEXT QUARTER →');
     e['screen-summary'].hidden = r.phase === 'pregame';
     if (r.phase !== 'pregame') {

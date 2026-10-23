@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test';
+import { startFranchise } from './start-helper.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
@@ -12,7 +13,7 @@ try {
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   await page.goto('http://localhost:5173');
   await page.evaluate(async () => (await import('/src/main.js')).loop.stop());
-  await page.locator('#start-franchise').click();
+  await startFranchise(page);
 
   const tick = count => page.evaluate(async count => {
     const { loop } = await import('/src/main.js');
@@ -164,7 +165,7 @@ try {
 
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.reload();
   await page.evaluate(async () => (await import('/src/main.js')).loop.stop());
-  await page.locator('#start-franchise').click(); await layout();
+  await startFranchise(page); await layout();
   assert.deepEqual(await page.evaluate(async () => {
     const { renderer, audio } = await import('/src/main.js');
     return { stadium: renderer.stadium.reducedMotion, effects: renderer.effects.reducedMotion, muted: !audio.enabled };

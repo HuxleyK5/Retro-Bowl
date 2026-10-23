@@ -1,6 +1,7 @@
 import { FORMATIONS } from '../football/Playbook.js';
 import { COVERAGES, DEFENSIVE_ADJUSTMENTS, THROW_DEPTHS, matchupAdvice } from '../football/Tactics.js';
 import { formatClock } from './GameHUD.js';
+import { isBeginnerMode } from './BeginnerMode.js';
 
 const phases = new Set(['ready', 'live', 'result']);
 const option = (value, name) => `<option value="${value}">${name}</option>`;
@@ -38,6 +39,9 @@ export class StrategyPanel {
         <div class="strategy-clock-actions"><button type="button" id="strategy-timeout" data-strategy="timeout" title="T / Call timeout">CALL TIMEOUT</button><button type="button" id="strategy-kneel" data-strategy="kneel" title="Lose a yard and use a down. The game clock keeps running.">KNEEL</button><button type="button" id="strategy-spike" data-strategy="spike" title="Use a down to stop the game clock with an incomplete pass.">SPIKE</button></div>
         <p id="strategy-tempo-help"><span id="strategy-tempo-description"></span><span>Kneel uses a down and keeps the clock running. Spike uses a down and stops it.</span></p>
       </div>`;
+    this.details = document.createElement('details'); this.details.id = 'beginner-strategy-options'; this.details.className = 'beginner-strategy-details';
+    this.summary = document.createElement('summary'); this.summary.textContent = 'More football options (optional)';
+    this.details.append(this.summary, ...this.root.childNodes); this.root.append(this.details);
     this.elements = Object.fromEntries([...this.root.querySelectorAll('[id]')].map(element => [element.id, element]));
     this.controls = [...this.root.querySelectorAll('[data-strategy]')];
     this.root.addEventListener('change', event => {
@@ -56,6 +60,10 @@ export class StrategyPanel {
   }
 
   update(paused = false) {
+    const beginner = isBeginnerMode();
+    if (beginner !== this.beginner) {
+      this.beginner = beginner; this.details.open = !beginner; this.summary.hidden = !beginner; this.lastKey = null;
+    }
     const m = this.match, r = m.rules, p = m.play;
     const visible = phases.has(r.phase);
     this.root.hidden = !visible;

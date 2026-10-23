@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test';
+import { startFranchise } from './start-helper.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
@@ -10,7 +11,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto('http://127.0.0.1:5173');
-  await page.locator('#start-franchise').click();
+  await startFranchise(page);
   await page.evaluate(async () => { const { loop, match } = await import('/src/main.js'); loop.stop(); match.start(60, false); loop.render(); });
   await page.waitForTimeout(100);
   const fixture = async () => page.evaluate(async () => {
@@ -149,7 +150,7 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   }
 
-  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.reload(); await page.locator('#start-franchise').click();
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.reload(); await startFranchise(page);
   assert.equal(await page.evaluate(async () => (await import('/src/main.js')).renderer.effects.reducedMotion), true);
   assert.deepEqual(errors, []);
   console.log('PASS: event feedback from real catches, tackles, interceptions, contact fumbles, both recovery sides and touchdowns; aim risk labels; event deduplication, paused effects, reset cleanup, mobile/desktop canvas, reduced motion, zero browser errors.');

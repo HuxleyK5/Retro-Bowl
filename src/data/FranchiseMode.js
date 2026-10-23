@@ -1,5 +1,6 @@
 import { PlayerData, POSITION_RATINGS, RATING_LABELS } from './PlayerData.js';
 import { availableRoster, effectiveRatings, applyGameWorkload, recoverTeam, developPlayer, agePlayer } from './PlayerLifecycle.js';
+import { createLeague, TEAMS } from './League.js';
 
 export const SEASON_WEEKS = 12;
 export const SALARY_CAP = 260000000;
@@ -22,12 +23,12 @@ function randomFor(text) {
 
 export class FranchiseMode {
   constructor(league, teamId, snapshot = null) {
-    if (!Array.isArray(league) || league.length !== 24 || !league.some(t => t.id === teamId)) throw new Error('Choose a valid franchise.');
+    if (!Array.isArray(league) || ![24, TEAMS.length].includes(league.length) || new Set(league.map(t => t.id)).size !== league.length || !league.every(t => TEAMS.some(club => club.id === t.id)) || !league.some(t => t.id === teamId)) throw new Error('Choose a valid franchise.');
     this.league = league;
     this.teamId = teamId;
     this.year = 1;
     this.week = 1;
-    this.phase = 'regular';
+    this.phase = 'draft';
     this.championId = null;
     this.history = [];
     this.log = [];
@@ -46,7 +47,8 @@ export class FranchiseMode {
     else {
       this._buildSchedule();
       this.freeAgents = this._generatePlayers(36, false);
-      this._log('A new franchise begins. Twelve games decide the eight playoff seeds.');
+      this._openDraft([this.teamId, ...league.filter(t => t.id !== this.teamId).map(t => t.id)]);
+      this._log('A new franchise begins with two draft rounds. Choose your rookies before the twelve-game season.');
     }
   }
 
@@ -81,7 +83,7 @@ export class FranchiseMode {
     const limit = SALARY_CAP + (this.year - 1) * 5000000;
     return { limit, payroll, deadMoney, space: limit - payroll - deadMoney };
   }
-  _log(message) { this.log.unshift(`Year ${this.year}, ${this.phase === 'offseason' ? 'offseason' : `week ${this.week}`}: ${message}`); this.log = this.log.slice(0, 100); }
+  _log(message) { this.log.unshift(`Year ${this.year}, ${this.phase === 'draft' ? 'draft' : this.phase === 'offseason' ? 'offseason' : `week ${this.week}`}: ${message}`); this.log = this.log.slice(0, 100); }
   _buildSchedule() {
     // Place the selected club opposite its next neighboring club in round one.
     const selected = this.league.findIndex(t => t.id === this.teamId), ids = this.league.map(t => t.id);
@@ -100,6 +102,11 @@ export class FranchiseMode {
   _fixture(week, stage, homeId, awayId, index = 0) { return { id: `y${this.year}-w${week}-${stage}-${index}`, year: this.year, week, stage, homeId, awayId, homeScore: null, awayScore: null, winnerId: null }; }
 
   assertReady() {
+    if (this.phase === 'draft') throw new Error('Complete your draft and start the season before playing.');
+    if (this.phase === 'offseason') throw new Error('Complete your offseason to start the next year.');
+    return this._assertRosterReady();
+  }
+  _assertRosterReady() {
     if (this.cap.space < 0) throw new Error('Your payroll exceeds the salary cap. Release or trade a player before playing.');
     for (const [position, count] of Object.entries(MIN_DEPTH)) if (this.team.roster.filter(p => p.position === position && !p.injury).length < count) throw new Error(`Your club needs at least ${count} healthy ${position} players. Sign a reserve before playing.`);
     return true;
@@ -120,6 +127,7 @@ export class FranchiseMode {
     return game;
   }
   simulateWeek() {
+    if (this.phase === 'draft') throw new Error('Complete your draft and start the season before simulating games.');
     if (this.phase === 'offseason') throw new Error('Complete your offseason to start the next year.');
     if (this.nextGame) this.assertReady();
     const week = this.week;
@@ -304,26 +312,29 @@ export class FranchiseMode {
     const userExpired = new Set((expiredByTeam.get(this.teamId) || []).map(p => p.id));
     this.freeAgents.sort((a, b) => Number(userExpired.has(b.id)) - Number(userExpired.has(a.id)) || b.overall - a.overall);
     this.freeAgents = this.freeAgents.slice(0, 400);
-    this.freeAgents.push(...this._generatePlayers(72, false));
-    this.prospects = this._generatePlayers(72, true);
-    this.draftOrder = this.standings.map(r => r.teamId).reverse(); this.draftCursor = 0; this.draftPicksRemaining = 2;
-    this._cpuDraftUntilUser();
+    this.freeAgents.push(...this._generatePlayers(this.league.length * 3, false));
+    this._openDraft(this.standings.map(r => r.teamId).reverse());
     this._log(`Offseason opened: ${departed} contracts expired; ${retired} players retired. Two draft rounds are available.`);
+  }
+  _openDraft(order) {
+    this.prospects = this._generatePlayers(this.league.length * 3, true);
+    this.draftOrder = order; this.draftCursor = 0; this.draftPicksRemaining = 2;
+    this._cpuDraftUntilUser();
   }
   _draftTo(team, player) {
     const salary = this._salary(player, true); this._room(team, salary);
     this.prospects = this.prospects.filter(p => p !== player); this._assign(team, player, contract(3, salary)); this.draftCursor++;
   }
   _cpuDraftUntilUser() {
-    while (this.draftCursor < 48 && this.draftOrder[this.draftCursor % 24] !== this.teamId) {
-      const team = this.league.find(t => t.id === this.draftOrder[this.draftCursor % 24]);
+    while (this.draftCursor < this.draftOrder.length * 2 && this.draftOrder[this.draftCursor % this.draftOrder.length] !== this.teamId) {
+      const team = this.league.find(t => t.id === this.draftOrder[this.draftCursor % this.draftOrder.length]);
       const candidates = [...this.prospects].sort((a, b) => b.potential + b.overall - a.potential - a.overall);
       const player = candidates.find(p => this._capFor(team.id).space >= this._salary(p, true));
       if (player && team.roster.length < ROSTER_LIMIT) this._draftTo(team, player); else this.draftCursor++;
     }
   }
   draft(playerId) {
-    if (this.phase !== 'offseason' || this.draftPicksRemaining <= 0 || this.draftCursor >= 48) throw new Error('Your draft picks are available during the offseason.');
+    if (!['draft', 'offseason'].includes(this.phase) || this.draftPicksRemaining <= 0 || this.draftCursor >= this.draftOrder.length * 2) throw new Error('Your draft picks are available before the season and during the offseason.');
     const player = this.prospects.find(p => p.id === playerId); if (!player) throw new Error('This prospect is no longer available.');
     this._draftTo(this.team, player); this.draftPicksRemaining--; this._cpuDraftUntilUser();
     this._log(`Drafted ${player.name}, ${player.specialty}, on a three-year rookie contract.`); return `${player.name} joins your club. ${this.draftPicksRemaining} picks remain.`;
@@ -356,25 +367,35 @@ export class FranchiseMode {
     }
   }
   advanceOffseason() {
-    if (this.phase !== 'offseason') throw new Error('Finish the championship before advancing to a new year.');
+    if (!['draft', 'offseason'].includes(this.phase)) throw new Error('Finish the championship before advancing to a new year.');
     const backup = { mode: this.toJSON(), rosters: this.league.map(t => t.roster.map(p => p.toJSON())) };
     try {
       return this._advanceOffseason();
     } catch (error) {
+      this.league.splice(backup.rosters.length);
       this.league.forEach((team, i) => { team.roster = backup.rosters[i].map(p => PlayerData.fromJSON(p)); });
       this._restore(backup.mode);
       throw error;
     }
   }
   _advanceOffseason() {
+    const inaugural = this.phase === 'draft';
     while (this.draftPicksRemaining > 0) {
       const player = [...this.prospects].sort((a, b) => b.potential + b.overall - a.potential - a.overall).find(p => this.cap.space >= this._salary(p, true));
       if (!player) throw new Error('Clear salary-cap space for your rookie contracts.');
       this.draft(player.id);
     }
-    this._manageCpuRosters();
+    if (!inaugural) this._manageCpuRosters();
     for (const team of this.league) this._ensureDepth(team);
-    this.assertReady(); this.year++; this.week = 1; this.phase = 'regular'; this.championId = null; this.playoffSeeds = [];
+    this._assertRosterReady();
+    if (this.league.length < TEAMS.length) {
+      const additions = createLeague().filter(team => !this.league.some(existing => existing.id === team.id));
+      this.league.push(...additions);
+      for (const team of additions) this.deadMoney[team.id] = 0;
+      this._log('The league expanded to all 32 NFL teams.');
+    }
+    if (!inaugural) this.year++;
+    this.week = 1; this.phase = 'regular'; this.championId = null; this.playoffSeeds = [];
     this.prospects = []; this.draftOrder = []; this.draftCursor = 0; this.trained = []; this.rested = false;
     for (const team of this.league) { recoverTeam(team, true); }
     this._buildSchedule(); this._log('A new season begins. Every club starts with a clean record.');
@@ -386,9 +407,10 @@ export class FranchiseMode {
   }
   _restore(snapshot) {
     const s = clone(snapshot), ids = new Set(this.league.map(t => t.id));
-    if (s.schemaVersion !== 1 || s.teamId !== this.teamId || !Number.isInteger(s.year) || s.year < 1 || s.year > 1000 || !Number.isInteger(s.week) || s.week < 1 || s.week > 16 || !['regular', 'playoffs', 'offseason'].includes(s.phase)) throw new Error('Invalid franchise season.');
-    if ((s.phase === 'regular' && s.week > 12) || (s.phase === 'playoffs' && (s.week < 13 || s.week > 15)) || (s.phase === 'offseason' && s.week !== 16)) throw new Error('Invalid season phase.');
-    if (!Array.isArray(s.schedule) || s.schedule.length < 144 || s.schedule.length > 151 || !Array.isArray(s.history) || !Array.isArray(s.log) || !s.log.every(v => typeof v === 'string') || !s.deadMoney || ![s.draftCursor, s.draftPicksRemaining, s.serial].every(unsigned) || s.draftCursor > 48 || s.draftPicksRemaining > 2 || typeof s.rested !== 'boolean') throw new Error('Invalid franchise records.');
+    const teamCount = this.league.length, regularGames = SEASON_WEEKS * teamCount / 2;
+    if (s.schemaVersion !== 1 || s.teamId !== this.teamId || !Number.isInteger(s.year) || s.year < 1 || s.year > 1000 || !Number.isInteger(s.week) || s.week < 1 || s.week > 16 || !['draft', 'regular', 'playoffs', 'offseason'].includes(s.phase)) throw new Error('Invalid franchise season.');
+    if ((s.phase === 'draft' && (s.year !== 1 || s.week !== 1)) || (s.phase === 'regular' && s.week > 12) || (s.phase === 'playoffs' && (s.week < 13 || s.week > 15)) || (s.phase === 'offseason' && s.week !== 16)) throw new Error('Invalid season phase.');
+    if (!Array.isArray(s.schedule) || s.schedule.length < regularGames || s.schedule.length > regularGames + 7 || !Array.isArray(s.history) || !Array.isArray(s.log) || !s.log.every(v => typeof v === 'string') || !s.deadMoney || ![s.draftCursor, s.draftPicksRemaining, s.serial].every(unsigned) || s.draftCursor > teamCount * 2 || s.draftPicksRemaining > 2 || typeof s.rested !== 'boolean') throw new Error('Invalid franchise records.');
     const gameIds = new Set(), weeklyTeams = new Set();
     for (const g of s.schedule) {
       if (!g || typeof g.id !== 'string' || gameIds.has(g.id) || g.year !== s.year || !ids.has(g.homeId) || !ids.has(g.awayId) || g.homeId === g.awayId || !Number.isInteger(g.week) || g.week < 1 || g.week > 15 || !['regular', 'quarterfinal', 'semifinal', 'championship'].includes(g.stage)) throw new Error('Invalid schedule.');
@@ -400,14 +422,21 @@ export class FranchiseMode {
       if (g.week < s.week && g.homeScore === null || g.week >= s.week && g.homeScore !== null) throw new Error('Invalid season progress.');
       if (g.stage !== 'regular' && g.homeScore !== null && g.homeScore === g.awayScore) throw new Error('Invalid playoff tie.');
     }
-    for (let week = 1; week <= 12; week++) if (s.schedule.filter(g => g.week === week).length !== 12) throw new Error('Incomplete schedule.');
-    const expectedLength = s.phase === 'regular' ? 144 : s.week === 13 ? 148 : s.week === 14 ? 150 : 151;
+    for (let week = 1; week <= SEASON_WEEKS; week++) if (s.schedule.filter(g => g.week === week).length !== teamCount / 2) throw new Error('Incomplete schedule.');
+    const beforePlayoffs = ['draft', 'regular'].includes(s.phase), drafting = ['draft', 'offseason'].includes(s.phase);
+    const expectedLength = regularGames + (beforePlayoffs ? 0 : s.week === 13 ? 4 : s.week === 14 ? 6 : 7);
     if (s.schedule.length !== expectedLength) throw new Error('Incomplete playoff bracket.');
-    if (!Array.isArray(s.playoffSeeds) || new Set(s.playoffSeeds).size !== s.playoffSeeds.length || !s.playoffSeeds.every(id => ids.has(id)) || (s.phase !== 'regular' && s.playoffSeeds.length !== 8) || !Array.isArray(s.trained) || !s.trained.every(id => this.team.roster.some(p => p.id === id)) || !Array.isArray(s.draftOrder) || !s.draftOrder.every(id => ids.has(id))) throw new Error('Invalid franchise state.');
+    if (!Array.isArray(s.playoffSeeds) || new Set(s.playoffSeeds).size !== s.playoffSeeds.length || !s.playoffSeeds.every(id => ids.has(id)) || (!beforePlayoffs && s.playoffSeeds.length !== 8) || !Array.isArray(s.trained) || !s.trained.every(id => this.team.roster.some(p => p.id === id)) || !Array.isArray(s.draftOrder) || !s.draftOrder.every(id => ids.has(id))) throw new Error('Invalid franchise state.');
     if (s.championId !== null && !ids.has(s.championId) || s.phase === 'offseason' && !ids.has(s.championId)) throw new Error('Invalid champion.');
-    if (s.phase !== 'offseason' && (s.championId !== null || s.draftOrder.length || s.draftCursor || s.draftPicksRemaining || s.prospects.length)) throw new Error('Invalid offseason progress.');
-    if (s.phase === 'regular' && s.playoffSeeds.length) throw new Error('Invalid playoff seeds.');
-    if (s.phase === 'offseason' && (s.draftOrder.length !== 24 || new Set(s.draftOrder).size !== 24)) throw new Error('Invalid draft order.');
+    if (s.phase !== 'offseason' && s.championId !== null || !drafting && (s.draftOrder.length || s.draftCursor || s.draftPicksRemaining || s.prospects.length)) throw new Error('Invalid offseason progress.');
+    if (beforePlayoffs && s.playoffSeeds.length) throw new Error('Invalid playoff seeds.');
+    if (drafting) {
+      if (s.draftOrder.length !== teamCount || new Set(s.draftOrder).size !== teamCount) throw new Error('Invalid draft order.');
+      const userIndex = s.draftOrder.indexOf(this.teamId);
+      const remaining = [userIndex, userIndex + teamCount].filter(pick => pick >= s.draftCursor).length;
+      if (remaining !== s.draftPicksRemaining || s.draftCursor < teamCount * 2 && s.draftOrder[s.draftCursor % teamCount] !== this.teamId) throw new Error('Invalid draft progress.');
+      if (s.phase === 'draft' && (userIndex !== 0 || s.history.length)) throw new Error('Invalid opening draft.');
+    }
     let eligible = s.playoffSeeds;
     for (const stage of ['quarterfinal', 'semifinal', 'championship']) {
       const games = s.schedule.filter(g => g.stage === stage);
@@ -426,6 +455,6 @@ export class FranchiseMode {
     };
     s.freeAgents = restorePool(s.freeAgents, 'free-agent'); s.prospects = restorePool(s.prospects, 'draft');
     for (const key of ['teamId', 'year', 'week', 'phase', 'championId', 'history', 'log', 'deadMoney', 'schedule', 'freeAgents', 'prospects', 'playoffSeeds', 'trained', 'rested', 'draftOrder', 'draftCursor', 'draftPicksRemaining', 'serial']) this[key] = s[key];
-    if (this.phase !== 'regular' && this.playoffSeeds.some((id, index) => id !== this.standings[index].teamId)) throw new Error('Invalid playoff qualification.');
+    if (!beforePlayoffs && this.playoffSeeds.some((id, index) => id !== this.standings[index].teamId)) throw new Error('Invalid playoff qualification.');
   }
 }

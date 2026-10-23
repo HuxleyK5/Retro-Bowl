@@ -1,22 +1,158 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createLeague } from '../src/data/League.js';
-import { FranchiseMode, SALARY_CAP } from '../src/data/FranchiseMode.js';
+import { FranchiseMode, SALARY_CAP, ROSTER_LIMIT } from '../src/data/FranchiseMode.js';
 import { saveFranchise, loadFranchise } from '../src/data/Franchise.js';
 import { availableRoster } from '../src/data/PlayerLifecycle.js';
 
-const create = (id = 'cgl-08') => new FranchiseMode(createLeague(), id);
+const openingDraft = (id = 'cgl-08') => new FranchiseMode(createLeague(), id);
+const create = (id = 'cgl-08') => { const mode = openingDraft(id); mode.advanceOffseason(); return mode; };
 const memory = () => ({ value: null, getItem() { return this.value; }, setItem(key, value) { this.value = value; } });
 const finishSeason = mode => { while (mode.phase !== 'offseason') mode.simulateWeek(); };
 
+test('24-team saved seasons preserve progress and expand to 32 NFL teams at the next season', () => {
+  const mode = new FranchiseMode(createLeague().slice(0, 24), 'cgl-08'), store = memory();
+  // Reproduce the pre-expansion regular-season save shape.
+  Object.assign(mode, { phase: 'regular', prospects: [], draftOrder: [], draftCursor: 0, draftPicksRemaining: 0 });
+  mode.simulateWeek();
+  saveFranchise(store, mode);
+  const restored = loadFranchise(store).mode;
+  assert.equal(restored.league.length, 24);
+  assert.equal(restored.team.name, 'Browns');
+  assert.equal(restored.week, 2);
+  assert.equal(restored.schedule.length, 144);
+  assert.deepEqual(restored.toJSON(), mode.toJSON());
+  finishSeason(restored);
+  assert.equal(restored.draftOrder.length, 24);
+  saveFranchise(store, restored);
+  const offseason = loadFranchise(store).mode;
+  offseason.advanceOffseason();
+  assert.equal(offseason.league.length, 32);
+  assert.equal(offseason.year, 2);
+  assert.equal(offseason.history.length, 1);
+  assert.equal(offseason.schedule.length, 192);
+  assert.equal(offseason.league.at(-1).name, 'Commanders');
+  assert.equal(offseason.deadMoney['cgl-32'], 0);
+  saveFranchise(store, offseason);
+  assert.deepEqual(loadFranchise(store).mode.toJSON(), offseason.toJSON());
+});
+
+test('an old opening draft resumes its two picks and expands when the first season starts', () => {
+  const mode = new FranchiseMode(createLeague().slice(0, 24), 'cgl-08'), store = memory();
+  mode.draft(mode.prospects[0].id); saveFranchise(store, mode);
+  const resumed = loadFranchise(store).mode;
+  assert.equal(resumed.draftPicksRemaining, 1);
+  assert.equal(resumed.league.length, 24);
+  const picked = resumed.team.roster.map(p => p.id);
+  resumed.advanceOffseason();
+  assert.equal(resumed.league.length, 32);
+  assert.equal(resumed.year, 1);
+  assert.ok(picked.every(id => resumed.team.roster.some(p => p.id === id)));
+  saveFranchise(store, resumed);
+  assert.ok(loadFranchise(store));
+});
+
+test('a new franchise drafts two rookies before year one without aging its existing players', () => {
+  const mode = openingDraft(), veteran = mode.team.roster[0];
+  const age = veteran.age, years = veteran.contract.yearsRemaining, rosterSize = mode.team.roster.length;
+  assert.equal(mode.phase, 'draft');
+  assert.equal(mode.prospects.length, 96);
+  assert.equal(mode.draftPicksRemaining, 2);
+  assert.equal(mode.draftOrder[0], mode.teamId);
+  assert.equal(new Set(mode.draftOrder).size, 32);
+  assert.deepEqual(new Set(mode.prospects.map(p => p.position)), new Set(['QB', 'RB', 'WR', 'OL', 'DEF', 'K', 'P']));
+  const before = mode.toJSON();
+  assert.throws(() => mode.assertReady(), /draft/);
+  assert.throws(() => mode.simulateWeek(), /draft/);
+  assert.throws(() => mode.recordGame(28, 7), /draft/);
+  assert.deepEqual(mode.toJSON(), before, 'games cannot advance during the draft');
+
+  const first = mode.prospects[0], salary = mode.quoteSalary(first, true), space = mode.cap.space;
+  mode.draft(first.id);
+  assert.equal(first.teamId, mode.teamId);
+  assert.equal(first.contract.yearsRemaining, 3);
+  assert.equal(first.contract.annualSalary, salary);
+  assert.equal(mode.cap.space, space - salary);
+  assert.equal(mode.team.roster.length, rosterSize + 1);
+  assert.equal(mode.draftPicksRemaining, 1);
+  assert.equal(mode.draftCursor, 32, 'other clubs make their first-round picks');
+  assert.throws(() => mode.draft(first.id), /no longer available/);
+  mode.draft(mode.prospects[0].id);
+  assert.equal(mode.draftPicksRemaining, 0);
+  assert.equal(mode.draftCursor, 64);
+  assert.throws(() => mode.draft(mode.prospects[0].id), /draft picks/);
+  assert.throws(() => mode.simulateWeek(), /draft/, 'the season starts only after the draft is confirmed');
+  mode.advanceOffseason();
+  assert.equal(mode.year, 1);
+  assert.equal(mode.week, 1);
+  assert.equal(mode.phase, 'regular');
+  assert.equal(mode.history.length, 0);
+  assert.equal(veteran.age, age);
+  assert.equal(veteran.contract.yearsRemaining, years);
+  assert.equal(mode.team.roster.length, rosterSize + 2);
+  assert.equal(mode.assertReady(), true);
+  assert.equal(mode.prospects.length, 0);
+  mode.simulateWeek();
+  assert.equal(mode.week, 2);
+});
+
+test('rookie contracts enforce cap space and roster capacity without consuming failed picks', () => {
+  const mode = openingDraft(), rookie = mode.prospects[0];
+  mode.deadMoney[mode.teamId] = mode.cap.limit;
+  const before = mode.toJSON(), roster = mode.team.roster.map(p => p.toJSON());
+  assert.throws(() => mode.draft(rookie.id), /salary cap/);
+  assert.deepEqual(mode.toJSON(), before);
+  assert.deepEqual(mode.team.roster.map(p => p.toJSON()), roster);
+  assert.throws(() => mode.advanceOffseason(), /salary-cap space/);
+  assert.deepEqual(mode.toJSON(), before, 'failed opening-season advancement rolls back');
+  assert.deepEqual(mode.team.roster.map(p => p.toJSON()), roster);
+
+  mode.deadMoney[mode.teamId] = 0;
+  for (const player of mode.team.roster) player.contract = Object.freeze({ ...player.contract, annualSalary: 0, guaranteed: 0 });
+  while (mode.team.roster.length < ROSTER_LIMIT) mode.sign(mode.freeAgents[0].id);
+  const full = mode.toJSON();
+  assert.throws(() => mode.draft(rookie.id), /at most 75 players/);
+  assert.deepEqual(mode.toJSON(), full);
+  assert.equal(mode.draftPicksRemaining, 2);
+});
+
+test('the opening draft saves and resumes before, between and after its picks', () => {
+  const mode = openingDraft(), store = memory();
+  for (let remaining = 2; remaining >= 0; remaining--) {
+    saveFranchise(store, mode);
+    const resumed = loadFranchise(store)?.mode;
+    assert.ok(resumed instanceof FranchiseMode);
+    assert.deepEqual(resumed.toJSON(), mode.toJSON());
+    assert.equal(resumed.draftPicksRemaining, remaining);
+    assert.throws(() => resumed.simulateWeek(), /draft/);
+    if (remaining > 0) mode.draft(mode.prospects[0].id);
+    else {
+      resumed.advanceOffseason();
+      assert.equal(resumed.phase, 'regular');
+      assert.equal(resumed.year, 1);
+    }
+  }
+  const saved = store.value;
+  for (const corrupt of [
+    s => { s.mode.week = 2; },
+    s => { s.mode.year = 2; },
+    s => { s.mode.draftPicksRemaining = 1; },
+    s => { s.mode.draftCursor = 47; },
+    s => { s.mode.draftOrder[1] = s.mode.draftOrder[0]; },
+  ]) {
+    const broken = JSON.parse(saved); corrupt(broken); store.value = JSON.stringify(broken);
+    assert.equal(loadFranchise(store), null);
+  }
+});
+
 test('a season schedules 12 different opponents per club and records the entire league once', () => {
   const mode = create();
-  assert.equal(mode.schedule.length, 144);
+  assert.equal(mode.schedule.length, 192);
   assert.equal(mode.nextGame.awayId, 'cgl-09');
   for (let week = 1; week <= 12; week++) {
     const games = mode.schedule.filter(g => g.week === week);
-    assert.equal(games.length, 12);
-    assert.equal(new Set(games.flatMap(g => [g.homeId, g.awayId])).size, 24);
+    assert.equal(games.length, 16);
+    assert.equal(new Set(games.flatMap(g => [g.homeId, g.awayId])).size, 32);
   }
   for (const team of mode.league) {
     const games = mode.schedule.filter(g => g.homeId === team.id || g.awayId === team.id);
@@ -25,7 +161,7 @@ test('a season schedules 12 different opponents per club and records the entire 
   const opening = mode.nextGame, result = mode.recordGame(35, 7, opening.id);
   assert.equal(result.homeScore, 35);
   assert.equal(mode.week, 2);
-  assert.equal(mode.schedule.filter(g => g.homeScore !== null).length, 12);
+  assert.equal(mode.schedule.filter(g => g.homeScore !== null).length, 16);
   const own = mode.standings.find(r => r.teamId === mode.teamId);
   assert.deepEqual([own.wins, own.losses, own.pf, own.pa], [1, 0, 35, 7]);
   const snapshot = mode.toJSON();
@@ -64,7 +200,7 @@ test('eight teams reach a seeded elimination bracket and a champion is preserved
   while (mode.phase !== 'offseason') {
     if (mode.nextGame) mode.recordGame(70, 0, mode.nextGame.id); else mode.simulateWeek();
   }
-  assert.equal(mode.schedule.length, 151);
+  assert.equal(mode.schedule.length, 199);
   assert.equal(mode.schedule.filter(g => g.stage === 'semifinal').length, 2);
   assert.equal(mode.schedule.filter(g => g.stage === 'championship').length, 1);
   const final = mode.schedule.find(g => g.stage === 'championship');
@@ -112,7 +248,7 @@ test('training, recovery and injury weeks affect the actual persistent players',
 });
 
 test('fatigue-selected backups receive experience for the game they actually started', () => {
-  const mode = create(), starter = mode.team.roster.find(p => p.position === 'QB');
+  const mode = create(), starter = availableRoster(mode.team).find(p => p.position === 'QB');
   let backup = null;
   for (let fatigue = 15; fatigue <= 100; fatigue++) {
     starter.fatigue = fatigue;
@@ -186,7 +322,7 @@ test('offseason ages players, expires deals, drafts two rounds and resets only t
   assert.equal(mode.history.length, 1);
   assert.equal(mode.cap.limit, SALARY_CAP + 5000000);
   assert.ok(mode.standings.every(r => r.wins + r.losses + r.ties === 0));
-  assert.equal(mode.schedule.length, 144);
+  assert.equal(mode.schedule.length, 192);
   assert.equal(mode.assertReady(), true);
   assert.throws(() => mode.draft(rookie.id), /offseason/);
 });
@@ -267,6 +403,7 @@ test('an offseason with every user contract expired still saves and resumes', ()
 
 test('saved seeded simulations produce the same result and can run multiple full years', () => {
   const mode = create(), store = memory();
+  let previousProspects = new Set();
   mode.simulateWeek(); saveFranchise(store, mode);
   const copy = loadFranchise(store).mode;
   mode.simulateWeek(); copy.simulateWeek();
@@ -274,6 +411,10 @@ test('saved seeded simulations produce the same result and can run multiple full
   for (let year = 1; year <= 3; year++) {
     finishSeason(mode);
     assert.equal(mode.history.length, year);
+    assert.equal(mode.draftPicksRemaining, 2, 'each upcoming season provides two new draft picks');
+    assert.ok(mode.prospects.length > 0);
+    assert.ok(mode.prospects.every(player => !previousProspects.has(player.id)), 'each draft has a fresh prospect class');
+    previousProspects = new Set(mode.prospects.map(player => player.id));
     saveFranchise(store, mode);
     assert.ok(loadFranchise(store));
     mode.advanceOffseason();

@@ -1,10 +1,11 @@
 import {chromium,expect} from '@playwright/test';
+import { startFranchise } from './start-helper.mjs';
 import assert from 'node:assert/strict';
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
- await page.goto('http://localhost:5173');await page.locator('#start-franchise').click();await page.locator('#screen-action').click(); await page.evaluate(async()=>{(await import('/src/main.js')).match.start(120,false)});
+ await page.goto('http://localhost:5173');await startFranchise(page);await page.locator('#screen-action').click(); await page.evaluate(async()=>{(await import('/src/main.js')).match.start(120,false)});
  // One continuous gesture snaps, survives the disappearing playbook, then throws.
  await page.evaluate(async()=>{const {loop}=await import('/src/main.js');loop.stop();loop.render()});
  await page.locator('#game').scrollIntoViewIfNeeded();

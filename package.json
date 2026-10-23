@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node tests/simulation.test.mjs && node tests/match.test.mjs && node tests/playbook.test.mjs && node tests/ratings.test.mjs && node tests/league.test.mjs && node tests/lifecycle.test.mjs && node tests/franchise.test.mjs && node tests/special-teams.test.mjs && node tests/defense-routes.test.mjs && node tests/gameplay.test.mjs && node tests/fumbles.test.mjs && node tests/clock.test.mjs && node tests/tactics.test.mjs && node tests/strategy-controller.test.mjs",
-    "test:browser": "node tests/browser.mjs && node tests/browser-playbook.mjs && node tests/browser-strategy.mjs && node tests/browser-ratings.mjs && node tests/browser-league.mjs && node tests/browser-franchise.mjs && node tests/browser-pull.mjs && node tests/browser-special-teams.mjs && node tests/browser-gameplay.mjs && node tests/browser-presentation.mjs"
+    "test": "node tests/simulation.test.mjs && node tests/match.test.mjs && node tests/playbook.test.mjs && node tests/ratings.test.mjs && node tests/league.test.mjs && node tests/lifecycle.test.mjs && node tests/franchise.test.mjs && node tests/special-teams.test.mjs && node tests/defense-routes.test.mjs && node tests/gameplay.test.mjs && node tests/fumbles.test.mjs && node tests/clock.test.mjs && node tests/tactics.test.mjs && node tests/strategy-controller.test.mjs && node tests/beginner-guide.test.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/browser-playbook.mjs && node tests/browser-strategy.mjs && node tests/browser-ratings.mjs && node tests/browser-league.mjs && node tests/browser-franchise.mjs && node tests/browser-pull.mjs && node tests/browser-special-teams.mjs && node tests/browser-gameplay.mjs && node tests/browser-presentation.mjs && node tests/browser-beginner.mjs && node tests/browser-draft-cards.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0"

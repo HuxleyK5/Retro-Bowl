@@ -1,37 +1,46 @@
 import { PlayerData } from './PlayerData.js';
 
-export const LEAGUE_NAME = 'Continental Gridiron League';
+export const LEAGUE_NAME = 'National Football League';
+// Stable slot IDs preserve existing player records and saved franchises.
+// Team directory: https://www.nfl.com/teams/
 const clubs = [
-  ['Alder Bay','Lanterns','#185b57','#f2cc74','Lantern Park'],
-  ['Copper Ridge','Prospectors','#87472f','#f3d29a','Foundry Stadium'],
-  ['Silverport','Tides','#244b77','#b9e3eb','Harbor Grounds'],
-  ['Red Mesa','Sunstones','#a43635','#f6c86b','Mesa Bowl'],
-  ['Briar Glen','Thorns','#335b36','#dbe6b0','Briar Grounds'],
-  ['Ironvale','Riveters','#414b61','#e8a053','Rivet Field'],
-  ['Northhaven','Auroras','#464780','#9de2d0','Northern Lights Stadium'],
-  ['Cinder Falls','Embers','#9c3e23','#ffda92','Caldera Park'],
-  ['Lakewood Reach','Ospreys','#216878','#e2e9db','Lakefront Stadium'],
-  ['Glass Harbor','Prisms','#603a84','#d9b8eb','Glassworks Field'],
-  ['Golden Prairie','Bison','#745d20','#f4e29d','Prairie Bowl'],
-  ['Stormford','Tempests','#343e69','#b9c8f0','Thunderhead Stadium'],
-  ['Juniper City','Roadrunners','#41786a','#eddaab','Juniper Field'],
-  ['Westmere','Sentinels','#6c3546','#e0bd88','Citadel Stadium'],
-  ['Highcrest','Summits','#35637f','#e0edf2','Alpine Grounds'],
-  ['Ashwater','Forge','#62382f','#f3a778','Anvil Park'],
-  ['Saffron Coast','Sails','#99611b','#fff0bb','Seabreeze Stadium'],
-  ['Pine Hollow','Timbermen','#305444','#cfb68c','Pinewood Field'],
-  ['Dusk Valley','Nightjars','#4a3565','#c9a7d7','Twilight Bowl'],
-  ['Stonebridge','Keystones','#5f6570','#e8d9bd','Archway Stadium'],
-  ['Frosthaven','Glaciers','#236784','#b8edf1','Icefield Park'],
-  ['Marigold','Comets','#854b24','#f3d586','Observatory Grounds'],
-  ['Windward','Kestrels','#52642f','#e0e7a5','Updraft Stadium'],
-  ['Verdant Falls','Cascades','#216457','#a9dec8','Waterfall Field'],
+  ['Arizona','Cardinals','#97233f','#ffb612','State Farm Stadium','ARI','NFC','West'],
+  ['Atlanta','Falcons','#a71930','#a5acaf','Mercedes-Benz Stadium','ATL','NFC','South'],
+  ['Baltimore','Ravens','#241773','#9e7c0c','M&T Bank Stadium','BAL','AFC','North'],
+  ['Buffalo','Bills','#00338d','#c60c30','Highmark Stadium','BUF','AFC','East'],
+  ['Carolina','Panthers','#0085ca','#bfc0bf','Bank of America Stadium','CAR','NFC','South'],
+  ['Chicago','Bears','#0b162a','#c83803','Soldier Field','CHI','NFC','North'],
+  ['Cincinnati','Bengals','#fb4f14','#000000','Paycor Stadium','CIN','AFC','North'],
+  ['Cleveland','Browns','#311d00','#ff3c00','Huntington Bank Field','CLE','AFC','North'],
+  ['Dallas','Cowboys','#003594','#869397','AT&T Stadium','DAL','NFC','East'],
+  ['Denver','Broncos','#fb4f14','#002244','Empower Field at Mile High','DEN','AFC','West'],
+  ['Detroit','Lions','#0076b6','#b0b7bc','Ford Field','DET','NFC','North'],
+  ['Green Bay','Packers','#203731','#ffb612','Lambeau Field','GB','NFC','North'],
+  ['Houston','Texans','#03202f','#a71930','Reliant Stadium','HOU','AFC','South'],
+  ['Indianapolis','Colts','#002c5f','#a2aaad','Lucas Oil Stadium','IND','AFC','South'],
+  ['Jacksonville','Jaguars','#006778','#d7a22a','EverBank Stadium','JAX','AFC','South'],
+  ['Kansas City','Chiefs','#e31837','#ffb81c','Arrowhead Stadium','KC','AFC','West'],
+  ['Las Vegas','Raiders','#000000','#a5acaf','Allegiant Stadium','LV','AFC','West'],
+  ['Los Angeles','Chargers','#0080c6','#ffc20e','SoFi Stadium','LAC','AFC','West'],
+  ['Los Angeles','Rams','#003594','#ffa300','SoFi Stadium','LAR','NFC','West'],
+  ['Miami','Dolphins','#008e97','#fc4c02','Hard Rock Stadium','MIA','AFC','East'],
+  ['Minnesota','Vikings','#4f2683','#ffc62f','U.S. Bank Stadium','MIN','NFC','North'],
+  ['New England','Patriots','#002244','#c60c30','Gillette Stadium','NE','AFC','East'],
+  ['New Orleans','Saints','#101820','#d3bc8d','Caesars Superdome','NO','NFC','South'],
+  ['New York','Giants','#0b2265','#a71930','MetLife Stadium','NYG','NFC','East'],
+  ['New York','Jets','#125740','#ffffff','MetLife Stadium','NYJ','AFC','East'],
+  ['Philadelphia','Eagles','#004c54','#a5acaf','Lincoln Financial Field','PHI','NFC','East'],
+  ['Pittsburgh','Steelers','#101820','#ffb612','Acrisure Stadium','PIT','AFC','North'],
+  ['San Francisco','49ers','#aa0000','#b3995d',"Levi's Stadium",'SF','NFC','West'],
+  ['Seattle','Seahawks','#002244','#69be28','Lumen Field','SEA','NFC','West'],
+  ['Tampa Bay','Buccaneers','#d50a0a','#ff7900','Raymond James Stadium','TB','NFC','South'],
+  ['Tennessee','Titans','#0c2340','#4b92db','Nissan Stadium','TEN','AFC','South'],
+  ['Washington','Commanders','#5a1414','#ffb612','Northwest Stadium','WAS','NFC','East'],
 ];
 const offense = ['Spread passing','Power running','Vertical passing','West coast timing','Play-action balance','Outside zone'];
 const defense = ['Zone coverage','Pressure front','Man coverage','Run containment'];
-export const TEAMS = Object.freeze(clubs.map(([city,name,primaryColor,secondaryColor,stadium], i) => Object.freeze({
-  id: `cgl-${String(i+1).padStart(2,'0')}`, city, name, primaryColor, secondaryColor, stadium,
-  abbreviation: city.split(' ').map(w=>w[0]).join('') + name[0],
+export const TEAMS = Object.freeze(clubs.map(([city,name,primaryColor,secondaryColor,stadium,abbreviation,conference,division], i) => Object.freeze({
+  id: `cgl-${String(i+1).padStart(2,'0')}`, city, name, primaryColor, secondaryColor, stadium, abbreviation, conference, division,
   offensiveIdentity: offense[i % offense.length], defensiveIdentity: defense[i % defense.length],
 })));
 const first = 'Adrian Bennett Callum Darius Ellis Felix Graham Holden Isaiah Jasper Kieran Lionel Marcus Nolan Orion Preston Quincy Rafael Silas Tobias Uriah Vaughn Wesley Xavier Yusuf Zeke Alden Brennan Cyrus Dalton Emmett Forrest Gideon Heath Idris Jonas Keaton Landon Micah Noel Oscar Pierce Remy Sterling Tristan Victor Warren Zander'.split(' ');

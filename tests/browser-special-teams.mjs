@@ -1,5 +1,6 @@
 ﻿import { chromium,expect } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { startFranchise } from './start-helper.mjs';
 import {lockMeter} from './special-helper.mjs';
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try{
@@ -7,7 +8,7 @@ try{
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`)});
  const read=()=>page.evaluate(async()=>{const{match,play,state}=await import('/src/main.js');return {phase:match.rules.phase,clock:match.rules.clock,playClock:match.rules.playClock,score:match.rules.score,result:match.rules.result,x:play.controlled.x,y:play.controlled.y,spot:match.rules.spot,down:match.rules.down,juke:play.controlled.jukeCooldown,meter:match.meter?{stage:match.meter.stage,value:match.meter.value}:null,paused:!state.playing}});
  const wait=async(fn,ms=8000)=>{const deadline=Date.now()+ms;while(Date.now()<deadline){const s=await read();if(fn(s))return s;await page.waitForTimeout(30)}assert.fail(JSON.stringify(await read()))};
- await page.goto('http://localhost:5173');await page.locator('#start-franchise').click();await page.locator('#screen-action').click();await wait(s=>s.phase==='kickoff');
+ await page.goto('http://localhost:5173');await startFranchise(page);await page.locator('#screen-action').click();await wait(s=>s.phase==='kickoff');
  const kickoff=await read();await page.waitForTimeout(200);assert.equal((await read()).clock,kickoff.clock);
  await wait(s=>s.phase==='return');const start=await read();await page.waitForTimeout(180);assert.ok((await read()).x>start.x);assert.ok((await read()).clock<start.clock);
  await page.locator('#game').focus();await page.keyboard.press('Escape');const frozen=await read();await page.waitForTimeout(160);assert.deepEqual(await read(),frozen);await page.keyboard.press('Escape');

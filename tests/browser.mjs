@@ -1,4 +1,5 @@
 import { lockMeter } from './special-helper.mjs';
+import { startFranchise } from './start-helper.mjs';
 import { pullPass } from './pull-helper.mjs';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
-  await page.goto('http://localhost:5173'); await page.locator('#start-franchise').click();
+  await page.goto('http://localhost:5173'); await startFranchise(page);
   await page.evaluate(async () => { const { match, play } = await import('/src/main.js'); match.rules.random = () => .4; match.opponent.random = () => .4; play.random = () => .4; });
   const snapshot = () => page.evaluate(async () => {
     const { play, state, match } = await import('/src/main.js'); const r = match.rules;
@@ -27,7 +28,13 @@ try {
   const clickWorld = point => pullPass(page, point);
   const fixture = async ({ spot = 25, down = 1, quarter = 1, clock = 60, playClock = 40 } = {}) => {
     await page.evaluate(async f => {
-      const { match, state } = await import('/src/main.js'); state.set('playing'); match.start(60, false);
+      const { match, state, play } = await import('/src/main.js');
+      // Keep the mouse and viewport fixtures on a fixed throwing profile as
+      // opening draft picks can otherwise change pass range and flight time.
+      for (const qb of play.rosters.home.filter(player => player.position === 'QB')) {
+        qb.setRatings({ throwPower: 84, accuracy: 88, speed: 56, awareness: 85 });
+      }
+      state.set('playing'); match.start(60, false);
       Object.assign(match.rules, { down: f.down, quarter: f.quarter, clock: f.clock, playClock: f.playClock });
       match.rules.newSeries(f.spot); match.rules.down = f.down; match.prepare();
       match.cpuAdjustment = 'cushion'; match.selectPlay('go');

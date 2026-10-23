@@ -11,20 +11,76 @@ try {
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   await page.goto('http://127.0.0.1:5173');
+  await page.locator('#beginner-mode').uncheck();
   await page.locator('[data-team="cgl-08"]').click();
   await page.locator('#start-franchise').click();
-  await page.locator('#franchise-toggle').click();
   const hub = page.locator('#franchise-screen');
   await expect(hub).toBeVisible();
-  assert.equal(await hub.locator('caption').filter({ hasText: 'League standings' }).locator('..').locator('tbody tr').count(), 24);
-  await page.screenshot({ path: 'test-results/franchise-overview.png', fullPage: true });
 
   const snapshot = () => page.evaluate(async () => {
     const { franchise: f } = await import('/src/main.js');
     return { year: f.year, week: f.week, phase: f.phase, cap: f.cap, roster: f.team.roster.map(p => p.toJSON()),
       record: f.standings.find(r => r.teamId === f.teamId), history: f.history, nextId: f.nextGame?.id,
-      played: f.schedule.filter(g => g.homeScore !== null).length };
+      played: f.schedule.filter(g => g.homeScore !== null).length, picks: f.draftPicksRemaining,
+      prospects: f.prospects.map(p => ({ id: p.id, name: p.name, position: p.specialty, salary: f.quoteSalary(p, true) })) };
   });
+  const opening = await snapshot();
+  assert.equal(opening.phase, 'draft');
+  assert.equal(opening.picks, 2);
+  await expect(hub.locator('.fr-draft-title')).toHaveText('DRAFT ROUND 1');
+  assert.equal(await hub.locator('[data-focus="play-game"]').count(), 0, 'opening draft comes before kickoff');
+  assert.equal(await hub.locator('[data-focus="simulateWeek-"]').count(), 0, 'cannot skip draft by simulating');
+  assert.equal(await hub.locator('.fr-prospect-card').count(), 10);
+  const money = value => `$${(value / 1000000).toFixed(2)}M`;
+  const visibleIds = await hub.locator('.fr-prospect-card').evaluateAll(cards => cards.slice(0, 5).map(card => card.dataset.prospectId));
+  for (const prospect of opening.prospects.filter(p => visibleIds.includes(p.id))) {
+    const row = hub.locator(`[data-prospect-id="${prospect.id}"]`);
+    await expect(row).toHaveAttribute('aria-label', new RegExp(`\\(${prospect.position}\\)`));
+    await expect(row.locator('.fr-star-rating')).toHaveAttribute('aria-label', /^(?:0\.5|[1-4](?:\.[05])?|5(?:\.0)?) out of 5 stars$/);
+    await expect(row.locator('.fr-draft-salary')).toContainText(money(prospect.salary));
+    await row.click();
+    await expect(hub.locator('.fr-draft-selection .fr-draft-total')).toContainText(money(prospect.salary * 3));
+  }
+  for (const width of [390, 960, 1440]) {
+    await page.setViewportSize({ width, height: 1100 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `opening draft fits ${width}px`);
+  }
+  // Quotes and disabled actions must reflect the actual available salary cap.
+  const originalDeadMoney = await page.evaluate(async () => {
+    const { franchise: f, franchisePanel: panel } = await import('/src/main.js');
+    const original = f.deadMoney[f.teamId];
+    f.deadMoney[f.teamId] = f.cap.limit - f.cap.payroll;
+    panel.render(); return original;
+  });
+  await expect(hub.locator('.fr-card-confirm')).toBeDisabled();
+  await page.evaluate(async original => {
+    const { franchise: f, franchisePanel: panel } = await import('/src/main.js');
+    f.deadMoney[f.teamId] = original; panel.render();
+  }, originalDeadMoney);
+  await hub.locator('.fr-prospect-card').first().click();
+  const firstPickId = await hub.locator('.fr-card-confirm').getAttribute('data-focus');
+  const firstPick = opening.prospects.find(p => `draft-${p.id}` === firstPickId);
+  await hub.locator(`[data-focus="${firstPickId}"]`).click();
+  const picked = await snapshot();
+  assert.equal(picked.picks, 1);
+  assert.equal(picked.roster.length, opening.roster.length + 1);
+  assert.equal(picked.cap.space, opening.cap.space - firstPick.salary);
+  assert.equal(picked.roster.find(p => p.id === firstPick.id).contract.yearsRemaining, 3);
+  await page.reload(); await page.locator('#continue-franchise').click();
+  await expect(hub.locator('.fr-draft-title')).toHaveText('DRAFT ROUND 2');
+  assert.equal((await snapshot()).picks, 1, 'in-progress opening draft survives reload');
+  assert.ok((await snapshot()).roster.some(p => p.id === firstPick.id));
+  assert.equal(await hub.locator(`[data-prospect-id="${firstPick.id}"]`).count(), 0, 'selected player leaves the prospect board');
+  await hub.locator('.fr-prospect-card').first().click();
+  await hub.locator('.fr-card-confirm').click();
+  assert.equal((await snapshot()).picks, 0);
+  await page.screenshot({ path: 'test-results/franchise-opening-draft.png', fullPage: true });
+  await hub.locator('[data-focus="advanceOffseason-"]').first().click();
+  assert.equal((await snapshot()).phase, 'regular');
+  assert.equal((await snapshot()).year, 1, 'opening draft starts the first season without advancing a year');
+  assert.equal((await snapshot()).played, 0);
+  assert.equal(await hub.locator('caption').filter({ hasText: 'League standings' }).locator('..').locator('tbody tr').count(), 32);
+  await page.screenshot({ path: 'test-results/franchise-overview.png', fullPage: true });
   const initial = await snapshot();
   await hub.locator('#fr-tab-roster').click();
   const trainee = initial.roster.filter(p => p.position === 'QB')[1];
@@ -85,7 +141,7 @@ try {
     loop.render(); loop.render();
   });
   assert.equal((await snapshot()).record.wins, 1);
-  assert.equal((await snapshot()).played, 12, 'one final advances all twelve fixtures, exactly once');
+  assert.equal((await snapshot()).played, 16, 'one final advances all sixteen fixtures, exactly once');
   await page.locator('#screen-action').click();
   await expect(hub).toBeVisible();
   assert.equal((await snapshot()).week, 2);
@@ -110,14 +166,16 @@ try {
   const offseason = await snapshot();
   assert.equal(offseason.phase, 'offseason');
   assert.equal(offseason.history.length, 1);
-  assert.equal(offseason.played, 151);
+  assert.equal(offseason.played, 199);
+  await expect(hub.locator('.fr-draft-title')).toHaveText('DRAFT ROUND 1');
+  await expect(hub.locator('.fr-draft-season-note')).toContainText('SEASON 2');
   await page.screenshot({ path: 'test-results/franchise-championship.png', fullPage: true });
-  await hub.locator('#fr-tab-draft').click();
   const rosterCount = offseason.roster.length;
-  await hub.locator('[data-focus^="draft-"]').first().click();
+  await hub.locator('.fr-prospect-card').first().click();
+  await hub.locator('.fr-card-confirm').click();
   assert.equal((await snapshot()).roster.length, rosterCount + 1);
   await page.screenshot({ path: 'test-results/franchise-draft.png', fullPage: true });
-  await hub.locator('[data-focus="advanceOffseason-"]').click();
+  await hub.locator('[data-focus="advanceOffseason-"]').first().click();
   const next = await snapshot();
   assert.equal(next.year, 2); assert.equal(next.week, 1);
   assert.equal(next.phase, 'regular'); assert.equal(next.record.wins, 0);
@@ -132,9 +190,10 @@ try {
     Storage.prototype.setItem = function () { throw new DOMException('Storage denied', 'SecurityError'); };
   });
   await memoryPage.goto('http://127.0.0.1:5173');
+  await memoryPage.locator('#beginner-mode').uncheck();
   await memoryPage.locator('#start-franchise').click();
-  await memoryPage.locator('#franchise-toggle').click();
   const memoryHub = memoryPage.locator('#franchise-screen');
+  await memoryHub.locator('[data-focus="draft-roster"]').click();
   await memoryHub.locator('#fr-tab-market').click();
   await memoryHub.locator('[data-focus^="sign-"]').first().click();
   await expect(memoryHub.locator('[role="alert"]')).toContainText('could not be saved');
@@ -145,5 +204,5 @@ try {
   assert.deepEqual(await memoryPage.evaluate(async () => (await import('/src/main.js')).franchise.team.roster.map(p => p.id)), signedIds);
   await memoryPage.close();
   assert.deepEqual(errors, []);
-  console.log('PASS: roster training, cap/dead money, signing/trading, saved transactions, healthy backup in live lineup, midgame lock/resume, one final updates standings, 12-week season, playoffs/championship, draft, year two, mobile layouts, zero browser errors.');
+  console.log('PASS: opening draft, positions/star ratings/contract costs, unaffordable picks, saved draft progress, roster training, cap/dead money, signing/trading, saved transactions, healthy backup in live lineup, midgame lock/resume, one final updates standings, 12-week season, playoffs/championship, next-season draft, year two, mobile layouts, zero browser errors.');
 } finally { await browser.close(); }

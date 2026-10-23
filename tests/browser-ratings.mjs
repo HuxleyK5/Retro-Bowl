@@ -1,4 +1,5 @@
 import { chromium, expect } from '@playwright/test';
+import { startFranchise } from './start-helper.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 await mkdir('test-results', {recursive:true});
@@ -8,7 +9,7 @@ try {
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
-  await page.goto('http://localhost:5173'); await page.locator('#start-franchise').click();
+  await page.goto('http://localhost:5173'); await startFranchise(page);
   const state=()=>page.evaluate(async()=>{
     const {state,match,play}=await import('/src/main.js');
     return {playing:state.playing,clock:match.rules.clock,playClock:match.rules.playClock,elapsed:play.elapsed,phase:match.rules.phase};
@@ -18,7 +19,8 @@ try {
   const schemas={QB:['throwPower','accuracy','speed','awareness'],RB:['speed','acceleration','strength','elusiveness','awareness'],WR:['speed','acceleration','catching','routeRunning','awareness'],OL:['strength','blocking','awareness'],DEF:['speed','strength','tackling','coverage','passRush','awareness']};
   for(const team of ['home','away']) {
     await page.selectOption('#ratings-team',team);
-    assert.equal(await page.locator('#ratings-player option').count(),53);
+    const rosterCount = await page.evaluate(async team => (await import('/src/main.js')).play.rosters[team].length, team);
+    assert.equal(await page.locator('#ratings-player option').count(),rosterCount);
     for(const [position,keys] of Object.entries(schemas)) {
       const record=await page.evaluate(async({team,position})=>{
         const {play}=await import('/src/main.js');return play.rosters[team].find(p=>p.position===position).toJSON();
@@ -51,5 +53,5 @@ try {
   }
   await page.locator('#ratings-close').click();await page.locator('#resume').click();
   assert.deepEqual(errors,[]);
-  console.log('PASS: both 53-player rosters, every position rating/value, derived abilities, pregame/live/already-paused inspection, frozen clocks, focus trap, responsive panel, zero browser errors.');
+  console.log('PASS: both complete post-draft rosters, every position rating/value, derived abilities, pregame/live/already-paused inspection, frozen clocks, focus trap, responsive panel, zero browser errors.');
 } finally {await browser.close();}

@@ -19,6 +19,9 @@ import { GameHUD } from './ui/GameHUD.js';
 import { PlaybookPanel } from './ui/PlaybookPanel.js';
 import { RatingsPanel } from './ui/RatingsPanel.js';
 import { StadiumAudio } from './audio/StadiumAudio.js';
+import { initializeBeginnerMode, isBeginnerMode } from './ui/BeginnerMode.js';
+
+initializeBeginnerMode();
 
 const canvas = document.querySelector('#game');
 const viewport = document.querySelector('#viewport');
@@ -163,8 +166,7 @@ const selection = new TeamSelection(league, saved, (chosenLeague, teamId, restor
   activeGameId = null; resultRecorded = false;
   franchisePanel.setFranchise(franchise);
   persistFranchise();
-  if (restoredMode || !franchise.nextGame) showHub();
-  else openFranchiseGame();
+  showHub();
 });
 
 const matchActive = () => !!activeGameId && !resultRecorded && !['pregame', 'final'].includes(match.rules.phase);
@@ -279,8 +281,28 @@ function showClubSelection() {
 }
 document.querySelector('#change-club').addEventListener('click', showClubSelection);
 const hubButton = document.createElement('button');
-hubButton.id = 'franchise-toggle'; hubButton.type = 'button'; hubButton.textContent = 'FRANCHISE HUB';
+hubButton.id = 'franchise-toggle'; hubButton.type = 'button'; hubButton.textContent = isBeginnerMode() ? 'MY TEAM' : 'FRANCHISE HUB';
 hubButton.addEventListener('click', () => { if (match.rules.phase === 'final') commitFinal(); showHub(); });
 document.querySelector('.controls').prepend(hubButton);
+document.querySelector('#football-basics').addEventListener('toggle', event => {
+  if (event.currentTarget.open && !selecting && !inHub && state.playing) {
+    const focus = document.activeElement;
+    const readingGuide = event.currentTarget.contains(focus);
+    state.set('paused');
+    if (readingGuide) focus.focus({ preventScroll: true });
+  }
+});
+document.addEventListener('beginner-mode-change', () => {
+  input.clear();
+  hud.screenPhase = null;
+  hubButton.textContent = isBeginnerMode() ? 'MY TEAM' : 'FRANCHISE HUB';
+  selection.render();
+  franchisePanel.render();
+  if (!selecting && !inHub) {
+    const paused = !state.playing;
+    hud.update(paused); playbook.update(paused); strategy.update(paused); kickMeter.update(paused);
+  }
+  resize();
+});
 loop.start();
 export { play, camera, state, loop, match, league, renderer, audio, franchise, franchisePanel, strategy };

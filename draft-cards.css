@@ -1,0 +1,61 @@
+.fr-draft-hub{background:#2864eb;border:3px solid #b9d9ff;border-radius:3px;box-shadow:5px 5px 0 #152e72;color:#fff}
+.fr-draft-screen{max-width:980px;margin:auto;padding:24px 34px 14px;font-family:monospace;color:#fff}
+.fr-draft-top{display:grid;grid-template-columns:110px minmax(0,1fr) 110px;align-items:center;gap:12px}
+.fr-draft-title{margin:0;text-align:center;font:bold clamp(19px,3vw,29px) monospace;letter-spacing:2px;color:#fff;text-shadow:2px 2px 0 #1642a5}
+.fr-draft-club{font:bold 13px monospace;letter-spacing:2px;padding:7px 10px;border:2px solid #c0dcff;width:max-content;box-shadow:2px 2px 0 #1642a5}
+.fr-draft-info{position:relative;font-size:11px;justify-self:end}
+.fr-draft-info summary{cursor:pointer;padding:10px 4px;color:#fff;white-space:nowrap}
+.fr-draft-info p{position:absolute;z-index:4;right:0;top:30px;width:280px;margin:0;background:#173e9c;color:#fff;padding:16px;border:2px solid #d0e8ff;box-shadow:4px 4px 0 #15337b;font:12px/1.8 monospace;text-align:left}
+.fr-draft-instruction{text-align:center;font:12px/1.8 monospace;color:#edf5ff;margin:15px 0 2px}
+.fr-draft-pager{display:flex;align-items:center;justify-content:center;gap:24px;margin:8px 0 16px}
+.fr-draft-page{min-width:100px;text-align:center;font:bold 12px monospace;letter-spacing:1px}
+.fr-draft-hub .fr-button{font-family:monospace;border:2px solid #d8ebff;border-radius:2px;background:#2864eb;color:#fff;box-shadow:2px 2px 0 #16429c;letter-spacing:.6px}
+.fr-draft-hub .fr-button:hover:not(:disabled){background:#3c7aff;border-color:#fff}
+.fr-draft-hub .fr-button:focus-visible,.fr-draft-info summary:focus-visible{outline:3px solid #fff19b;outline-offset:4px}
+.fr-draft-hub .fr-draft-arrow{padding:6px 12px;min-width:44px;min-height:36px;font-size:15px}
+.fr-draft-hub .fr-button:disabled{opacity:.5}
+.fr-draft-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:15px;margin:0 auto;max-width:780px;min-height:360px;align-content:start}
+.fr-draft-hub .fr-prospect-card{display:flex;flex-direction:column;padding:0;overflow:hidden;border:3px solid #e5f1ff;background:#333e4a;box-shadow:3px 3px 0 #173c8d;letter-spacing:0;text-align:center;min-width:0;position:relative;color:#fff}
+.fr-draft-hub .fr-prospect-card:hover:not(:disabled){background:#424f5c;transform:translateY(-2px)}
+.fr-draft-hub .fr-prospect-card[aria-pressed=true]{border-color:#fff09a;box-shadow:0 0 0 3px #153c9c,0 0 0 6px #fff09a}
+.fr-card-art{display:block;position:relative;width:100%;height:76px;background:#63c4e1;border-bottom:3px solid #e5f1ff;overflow:hidden}
+.is-defense .fr-card-art{background:#ed5760}
+.fr-card-position-code{position:absolute;left:7px;top:6px;color:#fff;font:bold 14px monospace;text-shadow:1px 1px #337698;z-index:1}
+.fr-card-portrait{display:block;width:90px;height:83px;margin:0 auto;image-rendering:pixelated}
+.fr-card-body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;padding:9px 5px 8px;flex:1}
+.fr-card-name{font:bold 14px monospace;letter-spacing:.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr-draft-screen .fr-draft-position{font:10px monospace;color:#e2edfb!important;line-height:1.4;min-height:14px}
+.fr-draft-screen .fr-star-rating{gap:0}.fr-draft-screen .fr-star-glyphs{font-size:15px;letter-spacing:0}
+.fr-draft-screen .fr-star-empty{color:#718093}.fr-draft-screen .fr-star-filled{color:#ffdf6d}
+.fr-draft-screen .fr-star-value{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.fr-draft-screen .fr-draft-salary{font:bold 17px monospace;color:#fff!important}
+.fr-card-cost-label{font:9px monospace;color:#c7d5e5}
+.fr-card-budget-warning{font:9px monospace;color:#ffe09b;padding-top:3px}
+.fr-prospect-card.is-unavailable{filter:saturate(.65)}
+.fr-draft-selection{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:90px;max-width:780px;margin:18px auto;padding:14px 16px;background:#1c50c7;border:2px solid #85baff}
+.fr-draft-selection h3{font:bold 17px monospace;margin:0 0 6px;color:#fff}
+.fr-draft-selection p{font:11px/1.7 monospace;margin:0;color:#ecf4ff}
+.fr-draft-selection .fr-card-contract{color:#d0e3ff;margin-top:5px;font-size:10px}
+.fr-draft-selection .fr-draft-total{color:#d0e3ff!important}
+.fr-draft-selection .fr-draft-reason{max-width:none;color:#fff0a1;margin-top:6px}
+.fr-draft-hub .fr-card-confirm{background:#fff09a;color:#193a80;border-color:#fff6c4;flex-shrink:0;padding:13px 16px;font-weight:bold;min-height:44px}
+.fr-draft-hub .fr-card-confirm:hover:not(:disabled){background:#fff8c7;color:#163271}
+.fr-draft-selection-actions{display:grid;gap:8px;flex-shrink:0}
+.fr-draft-hub .fr-card-back{font-size:10px;padding:8px 12px;min-height:36px}
+.fr-draft-footer{display:grid;grid-template-columns:minmax(170px,1fr) auto auto auto;gap:18px;align-items:center;max-width:780px;margin:0 auto;padding:0;color:#fff;font:11px monospace}
+.fr-draft-budget{display:grid;gap:6px;min-width:0}.fr-draft-budget>span{font:bold 10px monospace;letter-spacing:.2px}
+.fr-draft-budget meter{width:100%;height:19px;appearance:none;border:2px solid #e0f0ff;padding:2px;background:#173681}
+.fr-draft-budget meter::-webkit-meter-bar{background:#15327e;border:0;border-radius:0}
+.fr-draft-budget meter::-webkit-meter-optimum-value{background:#f4e94a}
+.fr-draft-budget meter::-moz-meter-bar{background:#f4e94a}
+.fr-draft-budget-left{font:10px monospace;color:#e0edff}
+.fr-draft-hub .fr-draft-roster,.fr-draft-hub .fr-draft-start{padding:12px 14px;min-height:44px;font-size:11px;font-weight:bold}
+.fr-draft-hub .fr-draft-start{background:#ecf6ff;color:#183e92}
+.fr-draft-hub .fr-draft-start:hover:not(:disabled){background:#fff;color:#183e92}
+.fr-draft-picks{text-align:center;display:grid;gap:5px;font:bold 10px monospace;white-space:nowrap}
+.fr-draft-picks strong{font-size:19px;border:2px solid #d5eaff;padding:3px 12px;background:#1b4bb5}
+.fr-draft-season-note{font:9px monospace;letter-spacing:.5px;text-align:center;color:#d1e3ff;margin:17px 0 0}
+.fr-draft-notice{font:12px/1.7 monospace;padding:10px 14px;background:#1747b1;border:1px solid #a9d3ff;max-width:780px;margin:12px auto}.fr-draft-notice.is-error{background:#7c314d;color:#fff1bb}
+@media(max-width:800px){.fr-draft-screen{padding:22px 20px 14px}.fr-draft-top{grid-template-columns:70px minmax(0,1fr) 90px}.fr-draft-title{font-size:22px;letter-spacing:1px}.fr-draft-grid{gap:10px}.fr-draft-footer{gap:12px;grid-template-columns:minmax(140px,1fr) auto auto}.fr-draft-start{grid-column:1/-1}.fr-card-name{font-size:12px}}
+@media(max-width:540px){.fr-draft-screen{padding:18px 12px 12px}.fr-draft-top{grid-template-columns:1fr auto;gap:8px}.fr-draft-title{font-size:19px;text-align:left;grid-column:1;grid-row:1}.fr-draft-club{display:none}.fr-draft-info{grid-column:2;grid-row:1}.fr-draft-info summary{font-size:10px}.fr-draft-info p{width:250px}.fr-draft-instruction{font-size:11px;text-align:left;margin-top:12px}.fr-draft-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;min-height:0}.fr-card-art{height:83px}.fr-card-portrait{width:96px;height:88px}.fr-card-name{font-size:14px}.fr-draft-selection{flex-direction:column;align-items:stretch;gap:12px;padding:13px}.fr-card-confirm{width:100%}.fr-draft-footer{grid-template-columns:minmax(0,1fr) auto;gap:14px}.fr-draft-budget{grid-column:1/-1}.fr-draft-picks{grid-column:2;grid-row:2}.fr-draft-roster{grid-column:1;grid-row:2}.fr-draft-start{grid-column:1/-1}.fr-draft-pager{justify-content:space-between}}
+@media(prefers-reduced-motion:reduce){.fr-draft-hub .fr-prospect-card:hover:not(:disabled){transform:none}}
