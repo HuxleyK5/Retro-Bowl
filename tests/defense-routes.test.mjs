@@ -65,7 +65,7 @@ test('coverage reads actual motion with awareness-dependent delay and never read
   wr.vx = 150; wr.vy = 0;
   for (let i = 0; i < 30; i++) { wr.x += wr.vx * dt; play.elapsed += dt; defense.update(play, dt); }
   wr.vx = 0; wr.vy = 150;
-  for (let i = 0; i < 11; i++) { wr.y += wr.vy * dt; play.elapsed += dt; defense.update(play, dt); }
+  for (let i = 0; i < 25; i++) { wr.y += wr.vy * dt; play.elapsed += dt; defense.update(play, dt); }
   const quickRead = defense.coverageTarget(aware, wr, field), slowRead = defense.coverageTarget(unaware, wr, field);
   assert.ok(quickRead.y > slowRead.y + 15, 'awareness recognizes the observed cut sooner');
   assert.ok(slowRead.x > quickRead.x + 10, 'the late reader still commits to the previous stem');

@@ -156,17 +156,18 @@ test('a QB fumble cancels the scripted draw exchange so it cannot take possessio
   assert.equal(p.recoveredBy, 'offense'); assert.equal(p.ball.mode, 'held');
 });
 
-test('waiting for the real slant break creates a completion window that an early throw misses', () => {
+test('a faster slant receiver creates an early open window before coverage closes the lane', () => {
   const results = [];
   for (const timing of [1, 2]) {
     const p = make(); p.configure(25, 'home', 35, 'slants'); p.snap(); step(p, timing);
-    const receiver = p.receivers[0], risk = p.aim(receiver).risk;
+    const receiver = p.receivers[0], { risk, separation } = p.aim(receiver);
     assert.equal(p.throw(receiver), true);
     for (let frame = 0; frame < 240 && p.phase === 'flight'; frame++) p.update(dt);
-    results.push({ p, receiver, risk });
+    results.push({ p, receiver, risk, separation });
   }
-  assert.equal(results[0].p.result, 'INTERCEPTION'); assert.equal(results[0].risk, 'contested');
-  assert.equal(results[1].p.carrier, results[1].receiver); assert.equal(results[1].risk, 'open');
+  assert.equal(results[0].p.carrier, results[0].receiver); assert.equal(results[0].risk, 'open');
+  assert.ok(results[0].separation > results[1].separation + 30, 'throwing into the early opening beats waiting for the lane to close');
+  assert.equal(results[1].p.carrier, results[1].receiver); assert.equal(results[1].risk, 'contested');
   assert.equal(results[1].p.phase, 'running');
   assert.ok(results[1].p.events.some(e => e.type === 'catch'));
 });

@@ -312,9 +312,18 @@ export class Play {
         }
         if (d < 20 + defender.ratings.tackling * .12 && defender.stunned <= 0 && this.catchProtection <= 0) {
           const momentum = Math.min(1, Math.hypot(p.vx, p.vy) / (p.speed * SPRINT_MULTIPLIER));
-          const contact = tackleResult(defender.ratings, p.ratings, { momentum, brokenTackles: p.brokenTackles });
+          const pace = Math.hypot(p.vx, p.vy);
+          const approach = pace > 1 && d > 0 ? ((defender.x - p.x) * p.vx + (defender.y - p.y) * p.vy) / (d * pace) : 1;
+          const contact = tackleResult(defender.ratings, p.ratings, {
+            momentum, brokenTackles: p.brokenTackles,
+            glancing: 1 - Math.abs(approach), fromBehind: approach < -.3,
+          });
           if (contact === 'broken') {
-            p.brokenTackles++; defender.stunned = .65; p.vx *= .7; p.vy *= .7;
+            p.brokenTackles++; defender.stunned = .85;
+            // Carry momentum through the contact and let the missed tackler fall behind.
+            p.vx *= .88; p.vy *= .88;
+            defender.vx *= .15; defender.vy *= .15;
+            this.catchProtection = .16;
             this.emit('brokenTackle', p, 'BROKEN TACKLE');
             this.notice = 'BROKEN TACKLE · Keep moving!'; continue;
           }

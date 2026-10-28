@@ -1,8 +1,8 @@
 export const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 export const SPRINT_MULTIPLIER = 1.25;
 export const JUKE_MULTIPLIER = 1.35;
-// Narrow rating differences while preserving each player's relative speed.
-export const topSpeed = r => 120 + .65 * r.speed;
+// Use the full speed rating so a fast receiver can pull away from slower pursuit.
+export const topSpeed = r => 90 + 1.1 * r.speed;
 export const acceleration = r => 340 + 2 * r.speed + 3.2 * r.acceleration;
 export const throwVelocity = r => 400 + 2.5 * r.throwPower;
 export const throwRange = r => 500 + 7 * r.throwPower;
@@ -35,10 +35,11 @@ export function blockDuration(blocker, defender) {
   const rush = .5 * defender.passRush + .3 * defender.strength + .2 * defender.awareness;
   return clamp(2.2 + (protection - rush) * .035, .35, 4.5);
 }
-export function tackleResult(defender, runner, { juking = false, momentum = 0, brokenTackles = 0 } = {}) {
+export function tackleResult(defender, runner, { juking = false, momentum = 0, brokenTackles = 0, glancing = 0, fromBehind = false } = {}) {
   const tackle = .6 * defender.tackling + .25 * defender.strength + .15 * defender.awareness;
   const evasion = .65 * runner.elusiveness + .2 * runner.awareness + .15 * runner.strength + 20;
   if (juking && evasion > tackle) return 'evaded';
-  const resistance = .55 * runner.strength + .3 * runner.elusiveness + .15 * runner.awareness + momentum * 10 - brokenTackles * 18;
-  return resistance > tackle + 25 ? 'broken' : 'tackled';
+  const resistance = .45 * runner.strength + .35 * runner.elusiveness + .2 * runner.awareness +
+    clamp(momentum, 0, 1) * 12 + clamp(glancing, 0, 1) * 14 + (fromBehind ? 6 : 0) - brokenTackles * 16;
+  return resistance > tackle + 12 ? 'broken' : 'tackled';
 }

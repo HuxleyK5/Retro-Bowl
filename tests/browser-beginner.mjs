@@ -104,12 +104,8 @@ try {
   assert.equal(await page.evaluate(async () => (await import('/src/main.js')).play.call.id), 'outs');
   await more.locator('summary').click();
 
-  const advanced = page.locator('#beginner-strategy-options');
-  await expect(advanced).not.toHaveAttribute('open', '');
-  await expect(page.locator('#strategy-formation')).toBeHidden();
-  await advanced.locator('summary').click();
-  await expect(page.locator('#strategy-formation')).toBeVisible();
-  await advanced.locator('summary').click();
+  await expect(page.locator('#strategy-panel select')).toHaveCount(0);
+  await expect(page.locator('#strategy-timeout')).toBeVisible();
   for (const width of [320, 390, 540, 960, 1440]) { await fit(width, 'beginner match'); await render(); }
   await fit(390, 'beginner match');
   await screenshot('beginner-match-mobile');
@@ -118,16 +114,15 @@ try {
   await mode.uncheck();
   await render();
   await expect(page.locator('#beginner-coach')).toBeHidden();
-  await expect(page.locator('#strategy-formation')).toBeVisible();
-  await expect(page.locator('#call-formation')).toBeVisible();
-  await expect(page.locator('#call-fit')).toBeVisible();
+  await expect(page.locator('#strategy-formation')).toHaveCount(0);
+  await expect(page.locator('#call-formation')).toBeHidden();
+  await expect(page.locator('#call-fit')).toBeHidden();
   assert.equal(await page.locator('#playbook [data-play]:visible').count(), 12);
   await expect(more.locator('summary')).toBeHidden();
-  await expect(advanced.locator('summary')).toBeHidden();
   await mode.check();
   await render();
   await expect(page.locator('#beginner-coach')).toBeVisible();
-  await expect(page.locator('#strategy-formation')).toBeHidden();
+  await expect(page.locator('#strategy-formation')).toHaveCount(0);
   assert.equal(await page.locator('#playbook [data-play]:visible').count(), 3);
 
   await page.evaluate(async () => {

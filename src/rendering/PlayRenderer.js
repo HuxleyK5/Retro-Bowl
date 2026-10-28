@@ -86,10 +86,11 @@ export class PlayRenderer {
     c.beginPath(); c.ellipse(ball.x, ball.y + 7, 9, 4, 0, 0, Math.PI * 2); c.fill();
     c.translate(ball.x, ball.y - ball.height - lift);
     c.rotate(ball.mode === 'flight' ? ball.elapsed * 14 : ball.mode === 'loose' ? ball.elapsed * 9 : .4);
-    c.fillStyle = '#a45b32'; c.strokeStyle = '#fff0c8'; c.lineWidth = 1.5;
-    c.beginPath(); c.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2); c.fill(); c.stroke();
-    c.beginPath(); c.moveTo(-5, 0); c.lineTo(5, 0);
-    for (let x = -3; x <= 3; x += 3) { c.moveTo(x, -2); c.lineTo(x, 2); } c.stroke();
+    c.fillStyle = '#512e21'; c.fillRect(-7, -6, 14, 12); c.fillRect(-10, -3, 20, 6);
+    c.fillStyle = '#bb7541'; c.fillRect(-7, -4, 14, 8); c.fillRect(-9, -2, 18, 4);
+    c.fillStyle = '#8c482b'; c.fillRect(-6, 2, 12, 2);
+    c.fillStyle = '#f6eac9'; c.fillRect(-5, -1, 10, 1);
+    for (let x = -3; x <= 3; x += 3) c.fillRect(x, -2, 1, 3);
     c.restore();
   }
 }

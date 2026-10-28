@@ -7,6 +7,8 @@ import { Play } from '../src/football/Play.js';
 import { Field } from '../src/world/Field.js';
 import { Routes, distance } from '../src/football/Routes.js';
 import { Opponent } from '../src/game/Opponent.js';
+import { configureDefense } from '../src/football/Tactics.js';
+import { createLeague } from '../src/data/League.js';
 import { blockDuration, reactionTime, pursuitLead, tackleResult, throwSpread } from '../src/football/RatingEffects.js';
 
 const dt = 1 / 60, field = new Field();
@@ -45,7 +47,7 @@ test('JSON round-trip preserves identity and ratings but contains no live simula
 test('rating changes persist through snaps, audibles and possession changes; team records stay separate', () => {
   const p = makePlay(); const homeQB = p.qb.data;
   p.qb.setRatings({accuracy: 97, speed: 95}); p.configure(40, 'home', 50, 'go');
-  assert.equal(p.qb.data, homeQB); assert.equal(p.qb.ratings.accuracy, 97); assert.equal(p.qb.speed, 181.75);
+  assert.equal(p.qb.data, homeQB); assert.equal(p.qb.ratings.accuracy, 97); assert.equal(p.qb.speed, 194.5);
   p.snap(); p.update(dt); p.reset(); assert.equal(p.qb.ratings.accuracy, 97);
   p.configure(25, 'away'); assert.notEqual(p.qb.data.id, homeQB.id); assert.equal(p.qb.data.teamId, 'away'); assert.equal(p.defenders[0].data.teamId, 'home');
   p.configure(25, 'home'); assert.equal(p.qb.data, homeQB);
@@ -79,14 +81,14 @@ test('equal speed and acceleration ratings give offense and defense the same mov
   }
 });
 
-test('default coverage defenders keep close to faster receivers without changing saved ratings', () => {
+test('default coverage uses saved speed differences without changing ratings', () => {
   const roster = deserializeRosters(serializeRosters(createRosters()));
   const snapshot = serializeRosters(roster), p = new Play(field, () => .4, roster);
   const receiver = p.receivers.reduce((fastest, player) => player.speed > fastest.speed ? player : fastest);
   const coverage = p.defenders.filter(defender => defender.assignment >= 0);
   assert.ok(coverage.length > 0);
   for (const defender of coverage) {
-    assert.ok(defender.speed >= receiver.speed * .8, 'coverage can keep at least eighty percent of receiver pace');
+    assert.ok(receiver.speed - defender.speed >= 25, 'saved speed gaps produce meaningful pace differences');
     assert.ok(defender.speed < receiver.speed, 'faster offensive ratings retain a real advantage');
   }
   p.snap(); for (let i = 0; i < 120; i++) p.update(dt);
@@ -224,4 +226,61 @@ test('QB awareness reads more receivers rather than randomly choosing a target',
     p.throw=target=>{choices.push(target);return true;};new Opponent(()=>.999).movement(p);
     assert.equal(choices.at(-1)===p.receivers[0],awareness===10);
   }
+});
+
+
+test('every league player moves using their saved speed and acceleration after the snap', () => {
+  const league = createLeague(); let count = 0;
+  for (const team of league) for (const data of team.roster) {
+    const p = new Player({ x: 500, y: 500, team: 'home', data });
+    tick(p, .5);
+    assert.ok(Math.abs(p.speed - (90 + 1.1 * p.ratings.speed)) < .0001);
+    assert.ok(p.vx > 0 && p.vx <= p.speed + .001);
+    count++;
+  }
+  assert.equal(count, 1696);
+});
+
+test('faster receivers beat slower man coverage while equally fast defenders limit separation', () => {
+  const gaps = [];
+  for (const defenderSpeed of [45, 95]) {
+    const p = makePlay(); p.configure(35, 'home', 45, 'go'); configureDefense(p, 'man'); p.reset();
+    const wr = p.receivers[0], d = p.defenders[0]; p.defenders = [d];
+    wr.setRatings({speed:95, acceleration:85}); d.setRatings({speed:defenderSpeed, acceleration:85, coverage:95, awareness:95});
+    p.snap(); for (let i=0; i<180; i++) p.update(dt);
+    gaps.push(wr.x - d.x);
+    assert.equal(p.phase, 'passing');
+  }
+  assert.ok(gaps[0] > 150, 'the speed mismatch produces real downfield separation');
+  assert.ok(gaps[1] < 80 && gaps[1] < gaps[0] * .5, 'a fast defender limits the same receiver to less than four yards of separation');
+});
+
+test('a fast runner pulls away from slower sprinting pursuit without an automatic catch-up boost', () => {
+  const p=makePlay(); p.snap(); p.handoff();
+  const runner=p.rb, d=p.defenders[0]; p.defenders=[d];
+  runner.setRatings({speed:95,acceleration:90}); d.setRatings({speed:45,acceleration:90});
+  Object.assign(runner,{x:1000,y:500,vx:runner.speed,vy:0});
+  Object.assign(d,{x:950,y:500,vx:0,vy:0});
+  for(let i=0;i<180;i++) p.update(dt,{x:1,y:0});
+  assert.equal(p.phase,'running');
+  assert.ok(runner.x-d.x > 100, 'the gap grows even when the defender sprints');
+});
+
+test('momentum and glancing contact help good runners shed tackles, while square hits and repeated contact stop them', () => {
+  const runner={...base,strength:85,elusiveness:85,awareness:85};
+  const defender={...base,tackling:90,strength:90,awareness:90};
+  assert.equal(tackleResult(defender,runner,{momentum:1}),'tackled');
+  assert.equal(tackleResult(defender,runner,{momentum:1,glancing:1}),'broken');
+  assert.equal(tackleResult(defender,runner,{momentum:1,glancing:1,brokenTackles:2}),'tackled');
+  const p=makePlay(); p.snap();p.handoff();const d=p.defenders[0];p.defenders=[d];
+  p.rb.setRatings({strength:90,elusiveness:90,awareness:90,speed:95});
+  d.setRatings({tackling:75,strength:75,awareness:75,speed:40});
+  Object.assign(p.rb,{x:1800,y:500,vx:p.rb.speed,vy:0});
+  Object.assign(d,{x:1800,y:523,vx:0,vy:0});
+  p.update(dt,{x:1,y:0});
+  assert.equal(p.rb.brokenTackles,1); assert.ok(d.stunned > .7);
+  assert.ok(p.events.some(e=>e.type==='brokenTackle'));
+  assert.ok(p.rb.vx > p.rb.speed*.8, 'the runner retains useful forward momentum');
+  for(let i=0;i<240&&p.live;i++)p.update(dt,{x:1,y:0});
+  assert.equal(p.result,'TOUCHDOWN', 'a broken tackle can become a real breakaway score');
 });

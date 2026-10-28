@@ -81,7 +81,10 @@ test('real routed pass is caught, control transfers, defenders pursue, and carri
   assert.equal(p.phase, 'running'); assert.equal(p.carrier, p.receivers[0]); assert.equal(p.controlled, p.carrier);
   const defenderDistance = Math.min(...p.defenders.map(d => distance(d, p.carrier)));
   advance(p, 10); assert.ok(Math.min(...p.defenders.map(d => distance(d, p.carrier))) < defenderDistance);
-  advance(p, 600, { x: -1, y: 0 }); assert.equal(p.result, 'TACKLED');
+  const tackler = p.defenders[0]; p.defenders = [tackler];
+  tackler.setRatings({ tackling: 99, strength: 99, awareness: 99 });
+  tackler.x = p.carrier.x + 15; tackler.y = p.carrier.y;
+  advance(p, 30, { x: 1, y: 0 }); assert.equal(p.result, 'TACKLED');
 });
 
 test('each receiver and the RB can complete a full snap-to-catch-to-breakaway touchdown with an open lane', () => {
@@ -212,4 +215,63 @@ test('catch instantly turns route momentum forward and ignores inherited QB stee
   advance(play,10,{x:-1,y:0});assert.ok(receiver.vx>0,'held QB direction cannot stop auto-run');
   play.update(dt,{x:0,y:0});
   advance(play,30,{x:-1,y:0});assert.ok(receiver.vx<0,'fresh steering works after releasing keys');
+});
+
+
+test('play camera opens on scrimmage, widens for routes, holds at catch, and resets next down', () => {
+  const field = new Field(), camera = new Camera(field), play = makePlay();
+  camera.resize(1000, 500); camera.followPlay(play, 0, true);
+  const opening = camera.zoom;
+  assert.ok(camera.width / opening <= 700, 'opening view covers the pocket');
+  assert.ok(Math.abs(camera.x - play.lineOfScrimmage) < 150);
+  play.snap();
+  play.receivers[0].x = play.lineOfScrimmage + 800;
+  for (let i = 0; i < 180; i++) camera.followPlay(play, dt);
+  assert.ok(camera.zoom < opening * .8, 'downfield routes widen the view');
+  for (const point of [play.qb, play.receivers[0]]) {
+    const screen = camera.worldToScreen(point);
+    assert.ok(screen.x > 0 && screen.x < camera.width, 'QB and deep receiver stay visible');
+  }
+  const wide = camera.zoom;
+  play.phase = 'running'; play.carrier = play.receivers[0];
+  camera.followPlay(play, dt);
+  assert.ok(camera.zoom <= wide + .001, 'catch keeps a stable zoom');
+  const beforeReset = { x: camera.x, y: camera.y, zoom: camera.zoom };
+  play.reset(); camera.followPlay(play, 0);
+  assert.deepEqual({ x: camera.x, y: camera.y, zoom: camera.zoom }, beforeReset, 'next down does not snap the camera');
+  camera.followPlay(play, dt);
+  assert.ok(Math.abs(camera.zoom - beforeReset.zoom) < .01, 'zoom starts gently');
+  assert.ok(Math.abs(camera.x - beforeReset.x) < 3, 'pan starts gently');
+  for (let i = 0; i < 240; i++) camera.followPlay(play, dt);
+  assert.ok(Math.abs(camera.zoom - opening) < .001, 'next down smoothly restores the close view');
+  play.phase = 'running'; play.carrier = play.rb; play.rb.x = play.lineOfScrimmage + 600;
+  for (let i = 0; i < 180; i++) camera.followPlay(play, dt);
+  assert.ok(camera.zoom < opening * .8, 'a long run also widens the view');
+  play.reset();
+  for (const [w, h] of [[320, 520], [1440, 600]]) {
+    camera.resize(w, h); camera.followPlay(play, 0, true);
+    const point = camera.screenToWorld(camera.worldToScreen(play.qb));
+    assert.ok(Math.abs(point.x - play.qb.x) < .001);
+    assert.ok(Math.abs(point.y - play.qb.y) < .001);
+    assert.ok(camera.x - w / camera.zoom / 2 >= -field.margin - .001);
+  }
+});
+
+
+test('camera preserves framing through resize and converges consistently at different frame rates', () => {
+  const play = makePlay(), field = new Field();
+  const cameras = [new Camera(field), new Camera(field)];
+  for (const c of cameras) { c.resize(1000, 500); c.followPlay(play, 0); }
+  const before = { x: cameras[0].x, zoom: cameras[0].zoom };
+  cameras[0].resize(1000, 480); cameras[0].followPlay(play, 0);
+  assert.equal(cameras[0].zoom, before.zoom, 'layout changes do not reset zoom');
+  assert.equal(cameras[0].x, before.x, 'layout changes do not reset position');
+  cameras[0].resize(1000, 500);
+  play.snap(); play.receivers[0].x = play.lineOfScrimmage + 800;
+  cameras.forEach((camera, i) => {
+    const fps = i ? 120 : 30;
+    for (let frame = 0; frame < fps * 2; frame++) camera.followPlay(play, 1 / fps);
+  });
+  assert.ok(Math.abs(cameras[0].zoom - cameras[1].zoom) < .001);
+  assert.ok(Math.abs(cameras[0].x - cameras[1].x) < .1);
 });

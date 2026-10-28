@@ -19,10 +19,11 @@ function make(id = 'slants', coverage = 'man', adjustment = 'balanced', formatio
 function advance(play, seconds) { for (let i = 0; i < Math.round(seconds / dt); i++) play.update(dt); }
 const gap = (play, player) => Math.min(...play.defenders.map(defender => distance(defender, player)));
 
-test('blitz creates earlier real pocket pressure and sacrifices coverage on the back outlet', () => {
+test('blitz creates earlier real pocket pressure and removes the back man assignment', () => {
   const man = make(), blitz = make('slants', 'blitz');
   for (const play of [man, blitz]) { play.snap(); advance(play, 2); }
-  assert.ok(gap(blitz, blitz.rb) > gap(man, man.rb) + 45, 'the extra rush leaves the back physically open');
+  assert.ok(man.defenders.some(d => d.coverageRole.type === 'man' && d.coverageRole.receiverIndex === 4));
+  assert.ok(!blitz.defenders.some(d => d.coverageRole.type === 'man' && d.coverageRole.receiverIndex === 4), 'the extra rusher gives up the back assignment');
   for (const play of [man, blitz]) for (let frame = 0; frame < 400 && play.live; frame++) play.update(dt);
   assert.equal(man.result, 'SACK'); assert.equal(blitz.result, 'SACK');
   assert.ok(blitz.elapsed < man.elapsed - 1, 'an edge rusher reaches the quarterback sooner without a success multiplier');

@@ -1,3 +1,4 @@
+import { pixelPlayerBust } from '../rendering/PixelArt.js';
 import { ROSTER_LIMIT } from '../data/FranchiseMode.js';
 import { positionLabel, positionRole } from '../data/FootballTerms.js';
 import { playerStars } from '../data/PlayerStars.js';
@@ -11,24 +12,22 @@ const node = (tag, className, text) => {
   return result;
 };
 
-// Original, code-drawn portraits stay sharp at every card size and need no downloads.
+// Every shape sits on a 40 x 40 pixel grid, including the jersey numerals.
 function portrait(player, defense) {
-  let seed = 0;
-  for (const letter of player.id) seed = (Math.imul(seed, 31) + letter.charCodeAt(0)) >>> 0;
-  const skin = ['#f2c59f', '#ce946e', '#9f6348', '#754735'][seed % 4];
-  const hair = ['#302821', '#704731', '#d8b565', '#171c25'][(seed >>> 3) % 4];
-  const jersey = defense ? '#b93049' : '#edf7ff';
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 48 44'); svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('viewBox', '0 0 40 40'); svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('class', 'fr-card-portrait'); svg.setAttribute('shape-rendering', 'crispEdges');
-  svg.innerHTML = `<path fill="#ffffff20" d="M0 32h48v12H0zM3 24h7v8H3zM39 19h6v13h-6z"/>
-    <path fill="${skin}" d="M19 9h12v13H19zM21 22h8v6h-8zM9 29h6v12H9zM35 29h6v12h-6z"/>
-    <path fill="${hair}" d="M19 6h11v3h3v8h-3v-5H19v5h-3V9h3z"/>
-    <path fill="#232c42" d="M21 15h2v2h-2zM27 15h2v2h-2z"/>
-    <path fill="#ac715b" d="M23 20h5v1h-5z"/>
-    <path fill="${jersey}" d="M16 26h6v3h7v-3h6v5h3v5h-5v8H17v-8h-5v-5h4z"/>
-    <path fill="${defense ? '#f3d376' : '#3482ba'}" d="M17 27h3v17h-3zM30 27h3v17h-3z"/>
-    <text x="25" y="40" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="${defense ? '#fff3ce' : '#315274'}">${Number(player.number)}</text>`;
+  let pixels = '';
+  const rect = (x, y, w, h, color) => { pixels += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"/>`; };
+  // Stadium lights and stepped stands frame the trading-card silhouette.
+  rect(2, 6, 2, 17, '#ffffff0d'); rect(36, 6, 2, 17, '#ffffff0d');
+  for (const x of [1, 35]) { rect(x, 4, 4, 2, '#c9dca460'); rect(x, 9, 4, 1, '#c9dca430'); }
+  rect(0, 27, 40, 13, '#14281f20');
+  for (let x = 0; x < 40; x += 4) rect(x, 29 + x % 3, 2, 1, '#d5e4ba20');
+  pixelPlayerBust(player, rect, defense ? {
+    shell: '#c4d69b', jersey: '#314b3d', shade: '#243b30', numberColor: '#e6edd9',
+  } : {});
+  svg.innerHTML = pixels;
   return svg;
 }
 

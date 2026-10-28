@@ -114,7 +114,7 @@ export class Defense {
   readReceiver(defender, receiver) {
     const samples = this.reads.get(receiver);
     if (!samples?.length) return receiver;
-    const delay = .05 + reactionTime(defender.ratings) * .45;
+    const delay = .1 + reactionTime(defender.ratings) * .8 + (99 - defender.ratings.coverage) * .001;
     const readTime = this.time - delay;
     let before = samples[0], after = before;
     for (const sample of samples) {
@@ -128,19 +128,24 @@ export class Defense {
     // Extrapolate the observed motion, never a receiver's future route. A cut
     // temporarily beats this read until the defender recognizes the change.
     const age = Math.min(delay, Math.max(0, this.time - (before.time + (after.time - before.time) * blend)));
-    observed.x += observed.vx * age; observed.y += observed.vy * age;
+    observed.x += observed.vx * age * .4; observed.y += observed.vy * age * .4;
     return observed;
   }
   coverageTarget(defender, receiver, field, adjustment = 'balanced') {
     if (!receiver) return defender;
     const r = defender.ratings;
     const read = this.readReceiver(defender, receiver);
-    const lead = .06 + r.awareness * .001;
+    const lead = .03 + r.awareness * .0005;
     const cushion = adjustment === 'press' ? 7 + (99 - r.coverage) * .2 :
       adjustment === 'cushion' ? field.yard * 3 + (99 - r.coverage) * .48 : 18 + (99 - r.coverage) * .48;
     const inside = (read.y < field.height / 2 ? 1 : -1) * (11 + (99 - r.coverage) * .3);
+    let targetX = read.x + read.vx * lead + cushion;
+    // On a vertical release, keep existing leverage instead of first running
+    // backward into the receiver. Cuts and curls still force a real turn.
+    if (read.vx > 30 && Math.abs(read.vy) < read.vx * .5 && defender.x > read.x)
+      targetX = Math.max(defender.x, targetX);
     return {
-      x: clamp(read.x + read.vx * lead + cushion, defender.radius, field.width - defender.radius),
+      x: clamp(targetX, defender.radius, field.width - defender.radius),
       y: clamp(read.y + read.vy * lead + inside, defender.radius, field.height - defender.radius),
     };
   }

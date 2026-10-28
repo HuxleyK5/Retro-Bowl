@@ -80,13 +80,13 @@ const ratings = new RatingsPanel(play, state, () => {
 const kickMeter = new KickMeterPanel(match, () => action('snap'));
 const playbook = new PlaybookPanel(match, id => {
   if (!state.playing || !match.selectPlay(id)) return;
-  input.clear(); camera.follow(play.controlled, 0, true); canvas.focus({ preventScroll: true });
+  input.clear(); camera.followPlay(play, 0); canvas.focus({ preventScroll: true });
 }, () => action('snap'));
 const strategy = new StrategyPanel(document.querySelector('#strategy-panel'), match, (name, value) => {
   if (selecting || inHub || !state.playing) return;
   if (match.tactic(name, value)) {
     if (['formation', 'motion', 'kneel', 'spike'].includes(name)) input.clear();
-    camera.follow(play.controlled, 0, true);
+    camera.followPlay(play, 0);
   }
   strategy.update(!state.playing);
 });
@@ -119,12 +119,12 @@ document.querySelector('#screen-action').addEventListener('click', () => {
     commitFinal(); showHub(); return;
   }
   else match.advance();
-  input.clear(); camera.follow(play.controlled, 0, true);
+  input.clear(); camera.followPlay(play, 0);
   canvas.focus({ preventScroll: true });
 });
 const resize = () => {
   const { width, height } = viewport.getBoundingClientRect();
-  renderer.resize(width, height); camera.follow(play.controlled, 0, true);
+  renderer.resize(width, height); camera.followPlay(play, 0);
 };
 new ResizeObserver(resize).observe(viewport);
 window.addEventListener('resize', resize);
@@ -134,7 +134,7 @@ const loop = new GameLoop(dt => {
   match.update(dt, input.movement);
   renderer.updateEffects(dt, play, match.rules);
   audio.update(dt, play, match.rules);
-  camera.follow(['flight', 'loose'].includes(play.ball.mode) ? play.ball : play.controlled, dt);
+  camera.followPlay(play, dt);
 }, () => {
   const canHold = input.drag && state.playing && match.humanTurn && match.rules.phase === 'live' && play.phase === 'passing' && play.call?.type !== 'run';
   if (!canHold) input.cancelDrag();

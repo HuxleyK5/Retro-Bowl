@@ -60,7 +60,7 @@ export class PlaybookPanel {
     this.beginner = beginner; this.lastContext = null; this.lastCall = null;
     this.starters.hidden = !beginner;
     this.moreSummary.hidden = !beginner; this.morePlays.open = !beginner;
-    this.formation.hidden = beginner; this.fit.hidden = beginner;
+    this.formation.hidden = true; this.fit.hidden = true;
     this.root.querySelector('.playbook-heading').lastElementChild.textContent = beginner ? 'CHOOSE, THEN START' : 'Q / E AUDIBLE';
     this.legend.innerHTML = beginner ? '<span><i class="chart-primary"></i>FIRST TEAMMATE TO LOOK FOR</span><span><i class="chart-los"></i>START LINE</span><span><i class="chart-first"></i>TARGET LINE</span>' : '<span><i class="chart-primary"></i>PRIMARY READ</span><span><i class="chart-los"></i>SCRIMMAGE</span><span><i class="chart-first"></i>FIRST DOWN</span>';
     for (const button of this.buttons) {

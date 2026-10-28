@@ -1,3 +1,4 @@
+import { drawArcadePlayer } from './ArcadePlayer.js';
 import { PlayRenderer } from './PlayRenderer.js';
 import { PlayEffects } from './PlayEffects.js';
 import { Stadium } from './Stadium.js';
@@ -16,6 +17,8 @@ export class Renderer {
     this.effects = new PlayEffects();
     this.stadium = new Stadium(field);
     this.lastResult = '';
+    this.playerSprite = document.createElement('canvas');
+    this.playerSprite.width = 40; this.playerSprite.height = 60;
     if (!this.ctx) throw new Error('A browser with Canvas 2D support is required.');
   }
   resize(width, height) {
@@ -67,8 +70,8 @@ export class Renderer {
   drawField(c) {
     const { width: w, height: h, endZone: end, yard } = this.field;
     c.fillStyle = '#e9eed9'; c.fillRect(-10, -10, w + 20, h + 20);
-    c.fillStyle = '#2d6b43'; c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 20; i++) { c.fillStyle = i % 2 ? '#33764a' : '#2d6b43'; c.fillRect(end + i * yard * 5, 0, yard * 5, h); }
+    c.fillStyle = '#318b42'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 20; i++) { c.fillStyle = i % 2 ? '#389848' : '#318b42'; c.fillRect(end + i * yard * 5, 0, yard * 5, h); }
     c.fillStyle = this.teams?.home.primaryColor || '#214f43'; c.fillRect(0, 0, end, h);
     c.fillStyle = this.teams?.away.primaryColor || '#304c61'; c.fillRect(w - end, 0, end, h);
     c.fillStyle = '#10251f35'; c.fillRect(0, 0, end, h); c.fillRect(w - end, 0, end, h);
@@ -111,43 +114,31 @@ export class Renderer {
   }
   drawPlayer(c, p, selected, carrier = false, primary = false) {
     c.save(); c.translate(Math.round(p.x), Math.round(p.y));
-    const scale = Math.min(1.75, Math.max(1, .62 / this.camera.zoom));
+    const scale = Math.min(2.1, Math.max(1, .88 / this.camera.zoom));
     c.scale(scale, scale);
-    c.fillStyle = '#0c211c80'; c.beginPath(); c.ellipse(5, 15, 21, 8, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#0c211c80'; c.beginPath(); c.ellipse(2, 13, 15, 5, 0, 0, Math.PI * 2); c.fill();
     if (selected || carrier) {
       c.fillStyle = selected ? '#dcff7b26' : '#ffd47724';
-      c.beginPath(); c.ellipse(0, 10, 28, 17, 0, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.ellipse(0, 11, 21, 11, 0, 0, Math.PI * 2); c.fill();
       c.strokeStyle = '#10261f'; c.lineWidth = 7; c.stroke();
       c.strokeStyle = selected ? '#e6ff94' : '#ffd477'; c.lineWidth = 3.5; c.stroke();
     }
-    if (selected) { c.fillStyle = '#e6ff94'; c.strokeStyle = '#10261f'; c.lineWidth = 3; c.beginPath(); c.moveTo(-8, -43); c.lineTo(8, -43); c.lineTo(0, -33); c.stroke(); c.fill(); }
+    if (selected) { c.fillStyle = '#e6ff94'; c.strokeStyle = '#10261f'; c.lineWidth = 3; c.beginPath(); c.moveTo(-6, -38); c.lineTo(6, -38); c.lineTo(0, -31); c.stroke(); c.fill(); }
     const reaction = this.effects.reaction(p);
     if (reaction) { c.translate(0, -reaction.lift); c.rotate(reaction.tilt); }
-    const stride = p.moving ? Math.round(Math.sin(p.stride) * 5) : 0;
-    c.fillStyle = '#10231f'; c.fillRect(-10, 7 + stride, 7, 10); c.fillRect(3, 7 - stride, 7, 10);
-    c.fillStyle = '#eee7ba'; c.fillRect(-10, 8 + stride, 7, 4); c.fillRect(3, 8 - stride, 7, 4);
-    c.fillStyle = '#ad7850';
-    if (reaction?.armsUp) { c.fillRect(-19, -25, 6, 18); c.fillRect(13, -25, 6, 18); }
-    else { c.fillRect(-17, -7 - stride / 2, 6, 12); c.fillRect(11, -7 + stride / 2, 6, 12); }
     const uniform = p.uniform || p.team;
     const club = this.teams?.[uniform];
-    const jersey = uniform === 'away' ? '#f2f2e5' : club?.primaryColor || '#2e6160';
-    const trim = uniform === 'away' ? club?.primaryColor || '#304c61' : club?.secondaryColor || '#f5d18a';
-    // A light outline and white away shirts keep even similar club palettes distinct.
-    c.fillStyle = '#071b17'; c.fillRect(-16, -15, 32, 25);
-    c.strokeStyle = '#fff9df'; c.lineWidth = 2; c.strokeRect(-16, -15, 32, 25);
-    c.fillStyle = jersey; c.fillRect(-13, -12, 26, 19);
-    c.fillStyle = trim; c.fillRect(-13, -11, 4, 7); c.fillRect(9, -11, 4, 7);
-    c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = textColor(jersey); c.fillText(p.number, 0, 0);
-    c.fillStyle = '#10221e'; c.fillRect(-11, -28, 22, 17);
-    c.fillStyle = club?.primaryColor || '#dfe9b8'; c.fillRect(-9, -26, 18, 12);
-    c.fillStyle = club?.secondaryColor || '#f2f3e0'; c.fillRect(-2, -26, 4, 12);
-    c.strokeStyle = '#fff9df'; c.lineWidth = 2; c.strokeRect(-10, -27, 20, 14);
-    c.fillStyle = '#10221e'; c.fillRect(p.facing > 0 ? 5 : -11, -18, 7, 6);
+    const jersey = uniform === 'away' ? '#f5f2df' : club?.primaryColor || '#2565ad';
+    const trim = uniform === 'away' ? club?.primaryColor || '#304c61' : club?.secondaryColor || '#ffda67';
+    drawArcadePlayer(this.playerSprite.getContext('2d'), p, {
+      jersey, trim, helmet: club?.primaryColor || '#e7ebd6', numberColor: textColor(jersey),
+    }, reaction, carrier);
+    c.imageSmoothingEnabled = false;
+    c.drawImage(this.playerSprite, -20, -36);
     if (p.jukeTime > 0) { c.strokeStyle = '#edff9e'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 34, -.7, 1.5); c.stroke(); }
     c.restore();
     if (selected || (p.team === 'home' && p.role !== 'LINEMAN')) {
-      c.save(); c.translate(p.x, p.y - 52 * scale); c.scale(1 / this.camera.zoom, 1 / this.camera.zoom);
+      c.save(); c.translate(p.x, p.y - 43 * scale); c.scale(1 / this.camera.zoom, 1 / this.camera.zoom);
       const label = selected ? `YOU #${p.number}` : primary ? `READ #${p.number}` : p.role === 'QUARTERBACK' ? `QB #${p.number}` : `#${p.number}`;
       c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
       const width = c.measureText(label).width + 10;
