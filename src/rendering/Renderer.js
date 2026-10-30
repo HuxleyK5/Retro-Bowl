@@ -113,7 +113,8 @@ export class Renderer {
     for (const x of [0, end, w - end, w]) for (const y of [-4, h - 4]) { c.fillStyle = '#efae63'; c.fillRect(x - 4, y, 8, 8); }
   }
   drawPlayer(c, p, selected, carrier = false, primary = false) {
-    c.save(); c.translate(Math.round(p.x), Math.round(p.y));
+    const reaction = this.effects.reaction(p);
+    c.save(); c.translate(Math.round(p.x + (reaction?.offsetX || 0)), Math.round(p.y + (reaction?.offsetY || 0)));
     const scale = Math.min(2.1, Math.max(1, .88 / this.camera.zoom));
     c.scale(scale, scale);
     c.fillStyle = '#0c211c80'; c.beginPath(); c.ellipse(2, 13, 15, 5, 0, 0, Math.PI * 2); c.fill();
@@ -124,7 +125,6 @@ export class Renderer {
       c.strokeStyle = selected ? '#e6ff94' : '#ffd477'; c.lineWidth = 3.5; c.stroke();
     }
     if (selected) { c.fillStyle = '#e6ff94'; c.strokeStyle = '#10261f'; c.lineWidth = 3; c.beginPath(); c.moveTo(-6, -38); c.lineTo(6, -38); c.lineTo(0, -31); c.stroke(); c.fill(); }
-    const reaction = this.effects.reaction(p);
     if (reaction) { c.translate(0, -reaction.lift); c.rotate(reaction.tilt); }
     const uniform = p.uniform || p.team;
     const club = this.teams?.[uniform];

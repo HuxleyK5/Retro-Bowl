@@ -118,9 +118,9 @@ export class Play {
     this.carrier = this.rb; this.controlled = this.rb; this.phase = 'running'; this.ball.attach(this.rb);
     this.notice = 'HANDOFF · Run right! SHIFT sprint · J juke'; return true;
   }
-  emit(type, player = this.carrier, label = '') {
+  emit(type, player = this.carrier, label = '', details = {}) {
     const point = player || this.ball;
-    this.events.push({ id: ++this.eventSerial, type, x: point.x, y: point.y,
+    this.events.push({ ...details, id: ++this.eventSerial, type, x: point.x, y: point.y,
       number: player?.number, team: player?.team, uniform: player?.uniform || player?.team, label });
     if (this.events.length > 48) this.events.shift();
   }
@@ -308,6 +308,7 @@ export class Play {
         const d = distance(defender, p);
         if (p.jukeTime > 0 && d < 35 + p.ratings.elusiveness * .4 && defender.stunned <= 0 &&
             tackleResult(defender.ratings, p.ratings, { juking: true }) === 'evaded') {
+          if (d < 45) this.emit('dive', defender, '', { targetX: p.x, targetY: p.y, missed: true });
           defender.stunned = .3 + p.ratings.elusiveness * .003; continue;
         }
         if (d < 20 + defender.ratings.tackling * .12 && defender.stunned <= 0 && this.catchProtection <= 0) {
@@ -318,6 +319,7 @@ export class Play {
             momentum, brokenTackles: p.brokenTackles,
             glancing: 1 - Math.abs(approach), fromBehind: approach < -.3,
           });
+          this.emit('dive', defender, '', { targetX: p.x, targetY: p.y, missed: contact === 'broken' });
           if (contact === 'broken') {
             p.brokenTackles++; defender.stunned = .85;
             // Carry momentum through the contact and let the missed tackler fall behind.

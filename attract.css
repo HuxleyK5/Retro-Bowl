@@ -1,0 +1,18 @@
+#attract-mode{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;gap:12px;padding:24px clamp(12px,4vw,60px);background:#111b1b;color:#e6e9dd;font-family:monospace;outline:none}
+#attract-mode[hidden]{display:none}
+.attract-header{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.attract-brand{display:grid;place-items:center;width:44px;height:44px;background:#d8ed9d;color:#17251f;font-size:22px;font-weight:bold;box-shadow:3px 3px #668164}
+.attract-header p{margin:0 0 5px;color:#a4b69d;font-size:10px;letter-spacing:2px}
+.attract-header h2{margin:0;font-size:20px;letter-spacing:1px}
+.attract-live{margin-left:auto;padding:9px 12px;border:1px solid #738563;color:#d8ed9d;font-size:11px}
+.attract-score{display:flex;align-items:center;justify-content:center;gap:32px;font-size:clamp(24px,5vw,48px);flex-shrink:0}
+.attract-score strong{border-bottom:4px solid;padding:0 8px 5px;min-width:80px;text-align:center}
+.attract-score b{font-size:1.2em;min-width:130px;text-align:center;color:#d8ed9d}
+.attract-status{text-align:center;margin:0;color:#b9cba7;font-size:11px;line-height:1.6;flex-shrink:0}
+.attract-field{flex:1;min-height:100px;overflow:hidden;border:2px solid #53664c;background:#318b42;box-shadow:4px 4px #0b1510}
+.attract-field canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.attract-footer{display:grid;gap:7px;text-align:center;padding:8px 0 0;flex-shrink:0}
+.attract-footer strong{color:#d8ed9d;font-size:clamp(11px,1.5vw,15px);letter-spacing:1px}
+.attract-footer span{font-size:10px;color:#a4b69d}
+@media(max-width:540px){#attract-mode{padding:14px 10px;gap:9px}.attract-score{gap:16px}.attract-header h2{font-size:16px}.attract-header p{font-size:8px}.attract-live{font-size:9px;padding:7px}.attract-status{font-size:9px}}
+@media(max-height:480px){#attract-mode{padding:8px 12px;gap:5px}.attract-header{display:none}.attract-score{font-size:20px}.attract-score strong{padding:0 0 2px}.attract-status{font-size:9px}.attract-footer{padding:2px 0}.attract-footer span{display:none}}

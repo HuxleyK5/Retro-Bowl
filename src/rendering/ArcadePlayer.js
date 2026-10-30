@@ -10,7 +10,8 @@ const tone = (hex, amount) => {
 // A side-view, full-body arcade sprite. All limb poses land on whole pixels.
 export function drawArcadePlayer(c, player, { jersey, trim, helmet, numberColor }, reaction, carrier) {
   c.clearRect(0, 0, 40, 60);
-  c.save(); c.translate(20, 36); c.scale(player.facing < 0 ? -1 : 1, 1);
+  const facing = reaction?.facing ?? player.facing;
+  c.save(); c.translate(20, 36); c.scale(facing < 0 ? -1 : 1, 1);
   const ink = '#18212b', skin = playerSkin(player.data || player);
   const rect = (x, y, w, h, color) => { c.fillStyle = color; c.fillRect(x, y, w, h); };
   const line = (x0, y0, x1, y1, width, color) => {
@@ -25,7 +26,7 @@ export function drawArcadePlayer(c, player, { jersey, trim, helmet, numberColor 
       if (twice <= dx) { error += dx; y0 += sy; }
     }
   };
-  const running = player.moving;
+  const running = player.moving && !reaction?.diving;
   const frame = running ? Math.floor(player.stride / (Math.PI * 2) * 6) % 6 : 0;
   const poses = [
     [[-4,6,-9,12],[5,6,9,10]],
@@ -35,7 +36,7 @@ export function drawArcadePlayer(c, player, { jersey, trim, helmet, numberColor 
     [[2,8,5,13],[-6,4,-10,6]],
     [[-1,7,2,13],[-4,5,-7,4]],
   ];
-  const legs = running ? poses[frame] : [[-4,7,-5,12],[4,7,5,12]];
+  const legs = reaction?.diving ? [[-4,4,-10,6],[3,5,0,10]] : running ? poses[frame] : [[-4,7,-5,12],[4,7,5,12]];
   const leg = (pose, back) => {
     const [kx, ky, fx, fy] = pose;
     line(back ? -3 : 2, 0, kx, ky, 6, ink);
@@ -49,7 +50,7 @@ export function drawArcadePlayer(c, player, { jersey, trim, helmet, numberColor 
   c.translate(running ? 1 : 0, bob);
   const arm = (back) => {
     const pump = running ? (frame < 3 ? -1 : 1) * (back ? -1 : 1) : 0;
-    const up = reaction?.armsUp;
+    const up = reaction?.armsUp || reaction?.diving;
     const elbow = up ? [8,-19] : carrier && !back ? [8,-4] : [pump*6+1,-5];
     const hand = up ? [11,-27] : carrier && !back ? [12,-8] : [pump*8+5,-9];
     line(back ? -5 : 1,-11, ...elbow, 5, ink);
@@ -65,8 +66,8 @@ export function drawArcadePlayer(c, player, { jersey, trim, helmet, numberColor 
   rect(-8,-10,4,2,trim); rect(4,-11,3,2,trim);
   rect(-5,0,10,2,'#f5f2df'); rect(-5,1,10,1,ink);
   c.save();
-  if (player.facing < 0) c.scale(-1, 1);
-  pixelNumber(player.number, player.facing < 0 ? -3 : -4, -9, numberColor, rect);
+  if (facing < 0) c.scale(-1, 1);
+  pixelNumber(player.number, facing < 0 ? -3 : -4, -9, numberColor, rect);
   c.restore();
   leg(legs[1], false);
   // Small profile helmet with exposed cheek, ear hole and a projecting face guard.

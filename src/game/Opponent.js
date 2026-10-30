@@ -7,7 +7,7 @@ export class Opponent {
   reset() { this.decision = null; this.lastJuke = -2; }
   selectPlay(rules, coverage = null) {
     this.situation = { down: rules.down, distance: rules.yardsToGo };
-    const urgent = [2, 4].includes(rules.quarter) && rules.clock < 30 && rules.score.away <= rules.score.home;
+    const urgent = [2, 4].includes(rules.quarter) && rules.clock < 30 && rules.score[rules.possession] <= rules.score[rules.possession === 'home' ? 'away' : 'home'];
     const run = !urgent && (rules.yardsToGo <= 3 ? this.random() < .7 : this.random() < .3);
     let choices = PLAYBOOK.filter(call => call.type === (run ? 'run' : 'pass'));
     const counters = { man: ['crosses', 'slants', 'outs'], cover2: ['posts', 'play-action', 'go'], cover3: ['outs', 'curls', 'crosses'], blitz: ['screen', 'slants', 'outs', 'draw'] };
@@ -18,7 +18,7 @@ export class Opponent {
   call(rules) {
     if (rules.down < 4) return 'snap';
     if (rules.fieldGoalDistance <= 53) return 'fieldGoal';
-    if (rules.quarter === 4 && rules.clock < 35 && rules.score.away < rules.score.home) return 'snap';
+    if (rules.quarter === 4 && rules.clock < 35 && rules.score[rules.possession] < rules.score[rules.possession === 'home' ? 'away' : 'home']) return 'snap';
     return 'punt';
   }
   movement(play) {

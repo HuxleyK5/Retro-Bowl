@@ -8,6 +8,10 @@ To play from another computer on the same network, keep `npm start` running on t
 
 Run `npm start` and open http://localhost:5173. Node.js is required. There are no runtime dependencies or build steps. Choose a club and click **Start Franchise** to enter the opening draft. Make your two rookie picks and click **Start Season** (unused picks are chosen automatically). Then choose **Play Game**, select a quarter length, and click **Start Game**. **Franchise Hub** opens management before kickoff or pauses an ongoing game. **Continue Saved Club** restores your franchise, including a draft in progress.
 
+## Idle exhibition
+
+After 45 seconds without keyboard, pointer, or scroll activity, a full-screen CPU-versus-CPU exhibition starts automatically. Both teams play, kick, and continue through all four quarters; another matchup follows the final score. Move the mouse, tap, scroll, or press any key to return. That first input only dismisses the exhibition. Your franchise, draft, and current game stay where you left them, including a paused game. Exhibitions use separate rosters and never write to your save.
+
 ## Beginner help
 
 **Beginner help** is on by default and remembers your choice in this browser. The **How to play** guide explains scoring, four tries to gain ten yards, passing, and running. During a game, the coach explains your next step and suggests a play or kick. Start with **Short pass**, **Run through the middle**, or **Long pass**; **More plays** and **More football options** reveal the full controls. You can turn Beginner help off at any time without restarting your game.

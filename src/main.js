@@ -1,3 +1,4 @@
+import { AttractMode } from './game/AttractMode.js';
 import { KickMeterPanel } from './ui/KickMeterPanel.js';
 import { pullTarget } from './input/PullPass.js';
 import { createLeague } from './data/League.js';
@@ -129,13 +130,21 @@ const resize = () => {
 new ResizeObserver(resize).observe(viewport);
 window.addEventListener('resize', resize);
 resize();
+const attract = new AttractMode({
+  onStart() { input.clear(); audio.setPaused(true); },
+  onEnd() { input.clear(); audio.setPaused(!state.playing || selecting || inHub); },
+});
 const loop = new GameLoop(dt => {
+  if (!attract.active && (input.keys.size || input.drag)) attract.activity();
+  attract.update(dt);
+  if (attract.active) return;
   if (selecting || inHub || !state.playing) return;
   match.update(dt, input.movement);
   renderer.updateEffects(dt, play, match.rules);
   audio.update(dt, play, match.rules);
   camera.followPlay(play, dt);
 }, () => {
+  if (attract.active) { attract.render(); return; }
   const canHold = input.drag && state.playing && match.humanTurn && match.rules.phase === 'live' && play.phase === 'passing' && play.call?.type !== 'run';
   if (!canHold) input.cancelDrag();
   const canAim = canHold && play.canThrow;
@@ -305,4 +314,4 @@ document.addEventListener('beginner-mode-change', () => {
   resize();
 });
 loop.start();
-export { play, camera, state, loop, match, league, renderer, audio, franchise, franchisePanel, strategy };
+export { play, camera, state, loop, match, league, renderer, audio, franchise, franchisePanel, strategy, attract };

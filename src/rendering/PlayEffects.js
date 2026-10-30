@@ -1,6 +1,7 @@
 const TAU = Math.PI * 2;
 const confettiColors = ['#fff0af', '#f4bf50', '#ed6c50', '#87d5d2', '#ecf8dd'];
 const styles = {
+  dive: { life: .95, label: '', visualOnly: true },
   catch: { color: '#edff9e', label: 'CAUGHT!', life: .85 },
   tackle: { color: '#ffe1ad', label: 'HIT!', life: .7 },
   bigHit: { color: '#ffae72', label: 'BIG HIT!', life: 1.15 },
@@ -60,6 +61,23 @@ export class PlayEffects {
   reaction(player) {
     if (!player) return null;
     const matches = effect => String(effect.number) === String(player.number) && (!effect.team || effect.team === player.team);
+    const dive = this.effects.findLast(effect => matches(effect) && effect.type === 'dive');
+    if (dive && !this.reducedMotion) {
+      const t = dive.age;
+      const dx = dive.targetX - dive.x, dy = dive.targetY - dive.y;
+      const distance = Math.hypot(dx, dy), nx = distance > 0 ? dx / distance : player.facing, ny = distance > 0 ? dy / distance : 0;
+      const facing = nx >= 0 ? 1 : -1;
+      const flight = Math.max(0, Math.min(1, (t - .08) / .25));
+      const recover = Math.max(0, Math.min(1, (t - .68) / .27));
+      const lean = t < .08 ? t / .08 * .25 : (.25 + flight * 1.2) * (1 - recover);
+      const travel = Math.min(24, distance * .55 + (dive.missed ? 10 : 0)) * flight;
+      return {
+        diving: true, facing, armsUp: false, tilt: facing * lean,
+        lift: Math.sin(flight * Math.PI) * 9,
+        offsetX: (dive.x - player.x + nx * travel) * (1 - recover),
+        offsetY: (dive.y - player.y + ny * travel + flight * 8) * (1 - recover),
+      };
+    }
     // A tackle and a big hit can share a tick; retain the stronger contact pose.
     const effect = this.effects.findLast(effect => matches(effect) && effect.type === 'touchdown') ||
       this.effects.findLast(effect => matches(effect) && effect.type === 'bigHit') ||
@@ -94,6 +112,18 @@ export class PlayEffects {
   drawWorld(c) {
     c.save();
     for (const effect of this.effects) {
+      if (effect.visualOnly) {
+        if (!this.reducedMotion && effect.age >= .3 && effect.age < .65) {
+          const t = (effect.age - .3) / .35;
+          c.globalAlpha = (1 - t) * .7; c.fillStyle = '#b7ca86';
+          for (let i = 0; i < 6; i++) {
+            const dx = (i % 3 - 1) * (5 + t * 24);
+            const dy = Math.floor(i / 3) * 5 - Math.sin(t * Math.PI) * (6 + i);
+            c.fillRect(Math.round(effect.targetX + dx), Math.round(effect.targetY + dy + 9), 3, 2);
+          }
+        }
+        continue;
+      }
       const progress = effect.age / effect.life;
       const fade = Math.min(1, (1 - progress) * 3);
       const impact = ['tackle', 'bigHit', 'brokenTackle', 'fumble'].includes(effect.type);

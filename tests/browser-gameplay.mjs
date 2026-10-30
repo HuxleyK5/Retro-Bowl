@@ -103,9 +103,18 @@ try {
     play.ball.attach(runner); play.random = () => fumble ? 0 : .99;
     loop.update(1 / 60); loop.render();
   }, fumble);
-  await fixture(); await contact(false); await tick(7);
+  await fixture(); await contact(false); await tick(14);
   const tackled = await snapshot(); assert.equal(tackled.result, 'TACKLED');
   assert.ok(tackled.effects.some(effect => effect.type === 'tackle'));
+  const divePose = () => page.evaluate(async () => {
+    const { play, renderer } = await import('/src/main.js');
+    return renderer.effects.reaction(play.defenders[0]);
+  });
+  const airborne = await divePose();
+  assert.ok(airborne.diving && Math.abs(airborne.tilt) > .9 && airborne.lift > 7);
+  await page.locator('#game').focus(); await page.keyboard.press('Escape');
+  await tick(20); assert.deepEqual(await divePose(), airborne, 'pause freezes the diving tackle');
+  await page.keyboard.press('Escape');
   await screenshot('gameplay-tackle');
 
   for (const side of ['offense', 'defense']) {

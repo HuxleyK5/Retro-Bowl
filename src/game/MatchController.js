@@ -7,13 +7,14 @@ import { COVERAGES, DEFENSIVE_ADJUSTMENTS, THROW_DEPTHS, chooseCpuCoverage, conf
 import { clockDecision } from './ClockStrategy.js';
 
 export class MatchController {
-  constructor(play, random = Math.random) {
+  constructor(play, random = Math.random, { cpuOnly = false } = {}) {
+    this.cpuOnly = cpuOnly;
     this.play = play; this.rules = new MatchRules(random); this.opponent = new Opponent(random);
     this.phaseAge = 0; this.lastPhase = this.rules.phase;
     this.selectedPlayId = DEFAULT_PLAY; this.meter = null; this.returns = new KickoffReturn(play);
     this.resetStrategy();
   }
-  get humanTurn() { return this.rules.possession === 'home'; }
+  get humanTurn() { return !this.cpuOnly && this.rules.possession === 'home'; }
   resetStrategy() {
     this.selectedFormation = 'play'; this.selectedMotion = 'none'; this.throwDepth = 'auto'; this.tempo = 'normal';
     this.defensiveCall = 'man'; this.defensiveAdjustment = 'balanced'; this.cpuCoverage = 'man'; this.cpuAdjustment = 'balanced';
@@ -21,10 +22,11 @@ export class MatchController {
   start(seconds, openingKickoff = true) { this.meter = null; this.rules.start(seconds); this.selectedPlayId = DEFAULT_PLAY; this.resetStrategy(); this.rules.kickoffPending = openingKickoff; this.prepare(); }
   prepare() {
     if (this.rules.kickoffPending) { this.beginKickoff(); return; }
-    if (this.humanTurn) {
+    if (this.humanTurn || this.cpuOnly) {
       this.cpuCoverage = chooseCpuCoverage(this.rules, this.opponent.random);
       this.cpuAdjustment = this.rules.yardsToGo <= 3 ? 'box' : this.rules.yardsToGo >= 15 ? 'cushion' : 'balanced';
     }
+    if (this.cpuOnly) { this.defensiveCall = this.cpuCoverage; this.defensiveAdjustment = this.cpuAdjustment; }
     const id = this.humanTurn ? this.selectedPlayId : this.opponent.selectPlay(this.rules, this.defensiveCall);
     this.configurePlay(id);
     this.opponent.reset(); this.phaseAge = 0;
@@ -108,7 +110,7 @@ export class MatchController {
     r.clockRunning = false; r.kick = null;
     this.play.configure(35, r.possession === 'home' ? 'away' : 'home');
     this.play.phase = 'dead'; this.play.isKickoff = true;
-    if (r.possession === 'away') this.startMeter('kickoff');
+    if (r.possession === 'away' && !this.cpuOnly) this.startMeter('kickoff');
     else this.returns.launch(r, { power: .5, accuracy: .12 });
   }
   startMeter(kind) {
@@ -170,8 +172,10 @@ export class MatchController {
     if (r.phase !== this.lastPhase) { this.phaseAge = 0; this.lastPhase = r.phase; }
     this.phaseAge += dt;
     r.tick(dt);
-    const cpuClock = clockDecision(r, 'away');
-    if (cpuClock.timeout) { r.timeout('away'); this.phaseAge = 0; }
+    const cpuSide = this.cpuOnly ? r.possession : 'away';
+    const otherSide = cpuSide === 'home' ? 'away' : 'home';
+    const cpuClock = clockDecision(r, cpuSide);
+    if (cpuClock.timeout) { r.timeout(cpuSide); this.phaseAge = 0; }
     if (this.humanTurn && this.tempo === 'chew' && ['ready', 'result'].includes(r.phase) && r.clockRunning && !r.next && !r.kickoffPending && r.playClock > 5) {
       r.tick(Math.min(dt * 5, r.playClock - 5, r.clock));
     }
@@ -194,8 +198,8 @@ export class MatchController {
     } else if (!this.humanTurn) {
       const snapDelay = cpuClock.tempo === 'hurry' ? .8 : cpuClock.tempo === 'chew' && r.clockRunning ? Infinity : 4;
       if (r.phase === 'ready' && (this.phaseAge > snapDelay || cpuClock.tempo === 'chew' && r.clockRunning && r.playClock <= 5)) {
-        const kneel = r.quarter === 4 && r.score.away > r.score.home && r.spot > 2 && r.down < 4 && r.clock <= Math.max(0, (4 - r.down) * 38 - r.timeouts.home * 25);
-        const spike = [2, 4].includes(r.quarter) && r.clock < 12 && r.clockRunning && r.score.away <= r.score.home && r.timeouts.away === 0 && r.down < 4;
+        const kneel = r.quarter === 4 && r.score[cpuSide] > r.score[otherSide] && r.spot > 2 && r.down < 4 && r.clock <= Math.max(0, (4 - r.down) * 38 - r.timeouts[otherSide] * 25);
+        const spike = [2, 4].includes(r.quarter) && r.clock < 12 && r.clockRunning && r.score[cpuSide] <= r.score[otherSide] && r.timeouts[cpuSide] === 0 && r.down < 4;
         if (kneel || spike) this.clockPlay(kneel ? 'kneel' : 'spike');
         else { const call = this.opponent.call(r); if (call === 'snap') this.snap(); else this.kick(call); }
       } else if (r.phase === 'extraPoint' && this.phaseAge > 1.3) this.kick('extraPoint');
