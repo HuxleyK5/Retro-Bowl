@@ -96,7 +96,7 @@ export class Play {
     this.defense.reset?.();
     this.events = []; this.eventSerial ??= 0; this.generation = (this.generation || 0) + 1;
     this.fumbleSpot = undefined; this.recoveredBy = undefined; this.fumbleCount = 0;
-    this.execution.reset(); this.isKickoff = false;
+    this.execution.reset(); this.isKickoff = false; this.kickKind = null;
     this.blocking.reset(); this.catchJitter = 0; this.autoRunAfterCatch = false; this.catchSteeringReady = false;
     this.carrier = this.qb; this.controlled = this.qb; this.phase = 'presnap'; this.elapsed = 0;
     this.result = ''; this.notice = 'SPACE TO SNAP · Attack the right end zone →'; this.hasThrown = false; this.passDistance = 0; this.catchProtection = 0;

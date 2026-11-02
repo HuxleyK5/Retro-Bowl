@@ -48,3 +48,14 @@ html:not(.beginner-mode) [data-beginner-only],html.beginner-mode [data-expert-on
 .beginner-mode .playbook-chart-legend{flex-wrap:wrap;justify-content:flex-start;gap:8px 12px}
 .beginner-mode .playbook #call-primary-read{font-size:11px;line-height:1.7}
 @media(max-width:700px){.beginner-settings{flex-direction:column;gap:5px;padding:12px 15px}.beginner-basics{text-align:left;max-width:100%;width:100%}.beginner-basics summary{padding:10px 0}.beginner-basics-copy{padding:0 0 5px}.beginner-coach{flex-direction:column;align-items:stretch;gap:10px;padding:17px 15px}.beginner-coach h2{font-size:18px}#beginner-recommendation{max-width:none;padding:9px 11px}.beginner-mode .play-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.beginner-mode .play-status{font-size:11px}}
+
+/* Large, readable kick timing controls match the arcade goalpost view. */
+.kick-meter{bottom:18px;width:min(600px,calc(100% - 24px));padding:20px 24px;box-shadow:5px 5px 0 #0b1b15}
+.kick-meter strong{font-size:clamp(16px,2vw,20px)}
+.kick-meter p{font-size:14px;margin:12px 0}
+.kick-meter small{font-size:11px}
+#kick-track{height:40px;margin:20px 12px;border-width:2px}
+#kick-needle{width:6px;top:-7px;bottom:-7px}
+#kick-lock{min-height:48px;min-width:220px;font-size:13px;padding:12px 20px}
+@media(max-width:540px){.kick-meter{padding:14px 12px;bottom:14px}.kick-meter p{font-size:12px;line-height:1.5}.kick-meter small{font-size:10px}#kick-track{height:36px;margin:17px 8px}#kick-lock{width:100%;min-width:0;font-size:12px}}
+@media(max-height:540px){.kick-meter{padding:9px 12px;bottom:10px}.kick-meter strong{font-size:14px}.kick-meter p{font-size:11px;margin:7px 0}.kick-meter small{display:none}#kick-track{height:28px;margin:12px 8px}#kick-lock{min-height:38px;padding:8px 12px;font-size:11px}}

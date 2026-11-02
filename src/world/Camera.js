@@ -51,10 +51,17 @@ export class Camera {
       x = passing ? (minX + maxX) / 2 + 50 : focus.x + 110;
       y += ((minY + maxY) / 2 - y) * (passing ? spread : 1);
     }
+    const scoringKick = ['fieldGoal', 'extraPoint'].includes(play.kickKind);
+    if (scoringKick) {
+      // Keep the uprights large and completely framed throughout the kick.
+      x = this.field.width - 5 - (this.width < 600 ? 80 : 180);
+      y = this.field.height / 2 + (this.width < 600 ? 70 : -90);
+      desiredZoom = Math.min(this.width / (this.width < 600 ? 600 : 780), this.height / 460);
+    }
     const floor = Math.max(this.width / (this.field.width + this.field.margin * 2),
       this.height / (this.field.height + this.field.margin * 2));
     // Hold the widest view through the whistle so a catch cannot cause a zoom jump.
-    this.playZoom = Math.min(this.playZoom ?? closeZoom, Math.max(floor, desiredZoom));
+    this.playZoom = scoringKick ? Math.max(floor, desiredZoom) : Math.min(this.playZoom ?? closeZoom, Math.max(floor, desiredZoom));
     // New downs change the destination, never the current position or zoom.
     const snap = immediate || !this.playFramed;
     const targetZoom = Math.max(floor, this.playZoom);

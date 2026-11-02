@@ -20,6 +20,9 @@ export class PlaybookPanel {
   constructor(match, select, snap) {
     this.match = match; this.root = document.querySelector('#playbook');
     this.stage = document.querySelector('#play-stage');
+    this.audibles = document.createElement('p'); this.audibles.id = 'audible-count';
+    this.audibles.setAttribute('role', 'status'); this.audibles.setAttribute('aria-live', 'polite');
+    this.root.querySelector('.playbook-heading').after(this.audibles);
     this.title = document.querySelector('#call-name'); this.description = document.querySelector('#call-description');
     this.formation = document.querySelector('#call-formation');
     this.canvas = document.querySelector('#call-preview'); this.canvas.width = 820; this.canvas.height = 440;
@@ -61,7 +64,7 @@ export class PlaybookPanel {
     this.starters.hidden = !beginner;
     this.moreSummary.hidden = !beginner; this.morePlays.open = !beginner;
     this.formation.hidden = true; this.fit.hidden = true;
-    this.root.querySelector('.playbook-heading').lastElementChild.textContent = beginner ? 'CHOOSE, THEN START' : 'Q / E AUDIBLE';
+    this.root.querySelector('.playbook-heading').lastElementChild.textContent = 'Q / E TO CHANGE';
     this.legend.innerHTML = beginner ? '<span><i class="chart-primary"></i>FIRST TEAMMATE TO LOOK FOR</span><span><i class="chart-los"></i>START LINE</span><span><i class="chart-first"></i>TARGET LINE</span>' : '<span><i class="chart-primary"></i>PRIMARY READ</span><span><i class="chart-los"></i>SCRIMMAGE</span><span><i class="chart-first"></i>FIRST DOWN</span>';
     for (const button of this.buttons) {
       const id = button.dataset.play, call = PLAYBOOK.find(call => call.id === id);
@@ -101,7 +104,11 @@ export class PlaybookPanel {
         button.title = this.beginner ? button.getAttribute('aria-label') : fit ? `${definition.description} Good fit: ${fit.reason}` : definition.description;
       }
     }
-    this.buttons.forEach(button => { button.disabled = paused; button.setAttribute('aria-pressed', String(button.dataset.play === call.id)); });
+    const remaining = this.match.audiblesRemaining;
+    this.root.querySelector('.playbook-heading').lastElementChild.textContent = remaining ? 'Q / E TO CHANGE' : 'PLAY LOCKED';
+    const audibleText = remaining ? `${remaining} AUDIBLE${remaining === 1 ? '' : 'S'} LEFT / Changing your play uses one` : 'NO AUDIBLES LEFT / Play locked';
+    if (this.audibles.textContent !== audibleText) this.audibles.textContent = audibleText;
+    this.buttons.forEach(button => { button.disabled = paused || remaining <= 0; button.setAttribute('aria-pressed', String(button.dataset.play === call.id)); });
     this.snap.disabled = paused;
     const motion = play.execution.motion, motionKey = motion ? `${Math.round(motion.player.x / 3)},${Math.round(motion.player.y / 3)}` : '';
     const fit = assessPlay(call, rules, play.coverage, play.defensiveAdjustment), receiver = play.receivers.find(player => player.slot === profile.primarySlot);

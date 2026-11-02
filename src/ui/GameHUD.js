@@ -109,7 +109,7 @@ export class GameHUD {
     this.updateScoreboard(r, paused, playClockActive);
     this.text('state-label', paused ? 'GAME PAUSED' : p.phase === 'loose' ? 'FUMBLE / BALL LOOSE' : `${names[r.phase]}${!this.match.humanTurn && ['ready', 'live', 'kick'].includes(r.phase) ? ' · CPU' : ''}`);
     let notice = r.detail;
-    if (r.phase === 'ready') notice = this.match.humanTurn ? `${p.call?.name || 'Offense'} · Q / E audible · SPACE snap · Play clock keeps running` : `${r.teams.away} is calling a play. Watch your defense work.`;
+    if (r.phase === 'ready') notice = this.match.humanTurn ? `${p.call?.name || 'Offense'} · ${this.match.audiblesRemaining} audibles left / Q / E · SPACE snap · Play clock keeps running` : `${r.teams.away} is calling a play. Watch your defense work.`;
     if (r.phase === 'live') notice = this.match.humanTurn ? p.notice : `${r.teams.away} OFFENSE / Computer-controlled possession`;
     if (r.phase === 'extraPoint') notice = this.match.humanTurn ? 'Untimed extra point · SPACE or the button to kick for +1' : `${r.teams.away} lines up for the extra point.`;
     if (r.phase === 'kick') notice = r.kick.kind === 'punt' ? 'Punt away · No return · Possession changes at the landing spot' : `${r.kick.distance}-yard ${r.kick.kind === 'extraPoint' ? 'extra point' : 'field goal'} attempt…`;

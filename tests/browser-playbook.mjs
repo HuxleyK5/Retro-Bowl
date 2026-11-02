@@ -15,7 +15,7 @@ try {
   await page.goto('http://localhost:5173'); await startFranchise(page); await page.locator('#screen-action').click(); await page.evaluate(async()=>{(await import('/src/main.js')).match.start(120,false)});
   const read = () => page.evaluate(async () => {
     const { play, match } = await import('/src/main.js');
-    return { id: play.call?.id, phase: match.rules.phase, playPhase: play.phase, elapsed: play.elapsed, carrierId: play.carrier?.data.id, qbId: play.qb.data.id, rbId: play.rb.data.id, canThrow: play.canThrow, clock: match.rules.clock, playClock: match.rules.playClock, down: match.rules.down, spot: match.rules.spot, routes: play.receivers.map(p => p.route), rb: { x: play.rb.x, y: play.rb.y }, guided: play.execution.guided };
+    return { id: play.call?.id, audibles: match.audiblesRemaining, phase: match.rules.phase, playPhase: play.phase, elapsed: play.elapsed, carrierId: play.carrier?.data.id, qbId: play.qb.data.id, rbId: play.rb.data.id, canThrow: play.canThrow, clock: match.rules.clock, playClock: match.rules.playClock, down: match.rules.down, spot: match.rules.spot, routes: play.receivers.map(p => p.route), rb: { x: play.rb.x, y: play.rb.y }, guided: play.execution.guided };
   });
   const waitFor = async (condition, timeout = 3000) => {
     const until = Date.now() + timeout;
@@ -29,6 +29,7 @@ try {
   assert.equal(await page.locator('[data-play]').count(), 12);
   const before = await read(); const signatures = [];
   for (const id of ['slants','outs','curls','posts','go','crosses','screen','play-action','inside','outside','sweep','draw']) {
+    await prepare();
     await page.locator(`[data-play="${id}"]`).click();
     await waitFor(v => v.id === id); await page.waitForTimeout(30);
     assert.equal(await page.locator(`[data-play="${id}"]`).getAttribute('aria-pressed'), 'true');
@@ -36,8 +37,26 @@ try {
     assert.ok(v.playClock <= before.playClock); signatures.push(JSON.stringify(v.routes));
   }
   assert.equal(new Set(signatures).size, 12);
+  await page.evaluate(async () => {
+    const { match, loop } = await import('/src/main.js');
+    const random = match.random; match.random = () => .999; match.start(120, false); match.random = random; loop.render();
+  });
+  await expect(page.locator('#audible-count')).toContainText('2 AUDIBLES LEFT');
+  await page.locator('#game').focus();
   await page.keyboard.press('e'); await waitFor(v => v.id === 'slants');
+  assert.equal((await read()).audibles, 1);
   await page.keyboard.press('q'); await waitFor(v => v.id === 'draw');
+  assert.equal((await read()).audibles, 0);
+  await expect(page.locator('#audible-count')).toContainText('NO AUDIBLES LEFT');
+  await expect(page.locator('[data-play="crosses"]')).toBeDisabled();
+  await expect(page.locator('#playbook-snap')).toBeEnabled();
+  await page.keyboard.press('e'); assert.equal((await read()).id, 'draw');
+  await page.evaluate(async () => {
+    const { match, loop } = await import('/src/main.js');
+    match.snap(); match.play.finish('INCOMPLETE'); match.rules.completePlay(match.play.outcome); match.advance(); loop.render();
+  });
+  await expect(page.locator('#audible-count')).toContainText('2 AUDIBLES LEFT');
+  await expect(page.locator('[data-play="crosses"]')).toBeEnabled();
   await page.locator('[data-play="crosses"]').click();
   await expect(page.locator('#call-formation')).toHaveText('Bunch right');
   await page.screenshot({path:'test-results/phase4-playbook.png',fullPage:true});

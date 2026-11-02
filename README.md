@@ -8,6 +8,10 @@ To play from another computer on the same network, keep `npm start` running on t
 
 Run `npm start` and open http://localhost:5173. Node.js is required. There are no runtime dependencies or build steps. Choose a club and click **Start Franchise** to enter the opening draft. Make your two rookie picks and click **Start Season** (unused picks are chosen automatically). Then choose **Play Game**, select a quarter length, and click **Start Game**. **Franchise Hub** opens management before kickoff or pauses an ongoing game. **Continue Saved Club** restores your franchise, including a draft in progress.
 
+## Random plays and audibles
+
+Every new offensive down starts with a random play from the full playbook. You get two audibles per down: press Q / E or choose a different play card to spend one. The counter shows how many changes remain. At zero, the call is locked and you can still snap it. Selecting the current play does not spend an audible. Timeouts and reopening the playbook do not refill the counter; a new down gives you two again.
+
 ## Idle exhibition
 
 After 45 seconds without keyboard, pointer, or scroll activity, a full-screen CPU-versus-CPU exhibition starts automatically. Both teams play, kick, and continue through all four quarters; another matchup follows the final score. Move the mouse, tap, scroll, or press any key to return. That first input only dismisses the exhibition. Your franchise, draft, and current game stay where you left them, including a paused game. Exhibitions use separate rosters and never write to your save.

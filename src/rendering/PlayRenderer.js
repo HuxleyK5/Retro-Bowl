@@ -11,10 +11,21 @@ export class PlayRenderer {
       c.strokeStyle = '#ffe18a'; c.lineWidth = 4; c.stroke();
     }
     }
-    c.strokeStyle = '#f4d37d'; c.lineWidth = 5;
+    // Chunky arcade uprights stay readable at the broadcast camera's scale.
     for (const x of [5, play.field.width - 5]) {
       const y = play.field.height / 2;
-      c.beginPath(); c.moveTo(x, y + 60); c.lineTo(x, y - 60); c.moveTo(x - 25, y - 60); c.lineTo(x + 25, y - 60); c.moveTo(x - 25, y - 60); c.lineTo(x - 25, y - 110); c.moveTo(x + 25, y - 60); c.lineTo(x + 25, y - 110); c.stroke();
+      c.fillStyle = '#10251f66'; c.fillRect(x - 22, y + 80, 90, 12);
+      c.fillStyle = '#233127'; c.fillRect(x - 11, y - 104, 22, 190);
+      c.fillRect(x - 108, y - 278, 18, 186); c.fillRect(x + 90, y - 278, 18, 186);
+      c.fillRect(x - 108, y - 108, 216, 18);
+      c.fillStyle = '#f4c742'; c.fillRect(x - 7, y - 100, 14, 182);
+      c.fillRect(x - 104, y - 274, 10, 178); c.fillRect(x + 94, y - 274, 10, 178);
+      c.fillRect(x - 104, y - 104, 208, 10);
+      c.fillStyle = '#fff1a6'; c.fillRect(x - 103, y - 273, 3, 171);
+      c.fillRect(x + 95, y - 273, 3, 171); c.fillRect(x - 102, y - 103, 204, 3);
+      c.fillStyle = '#1b3a2d'; c.fillRect(x - 14, y + 26, 28, 60);
+      c.fillStyle = '#668164'; c.fillRect(x - 11, y + 29, 4, 54);
+      c.fillStyle = '#d8ed9d'; c.fillRect(x - 10, y + 46, 20, 4);
     }
     if (play.phase === 'presnap') {
       const primarySlot = play.previewSlot || (play.call?.type === 'run' ? '22' : '81');

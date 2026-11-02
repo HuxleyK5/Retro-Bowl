@@ -85,6 +85,7 @@ try {
   assert.equal(await page.locator('#beginner-plays [data-play]').count(), 3);
   assert.equal(await page.locator('#playbook [data-play]').count(), 12);
   for (const id of ['slants', 'inside', 'go']) {
+    await page.evaluate(async () => { const {match,loop} = await import('/src/main.js'); match.start(120, false); loop.render(); });
     const button = page.locator(`#beginner-plays [data-play="${id}"]`);
     await expect(button).toBeVisible();
     await expect(button.locator('strong')).toHaveText({ slants: 'Short pass', inside: 'Run through the middle', go: 'Long pass' }[id]);

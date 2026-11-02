@@ -275,3 +275,21 @@ test('camera preserves framing through resize and converges consistently at diff
   assert.ok(Math.abs(cameras[0].zoom - cameras[1].zoom) < .001);
   assert.ok(Math.abs(cameras[0].x - cameras[1].x) < .1);
 });
+
+
+test('scoring kicks ease into a large goalpost view and return to normal framing next down', () => {
+  for (const [width,height] of [[1000,500],[390,550],[320,550]]) {
+    const field=new Field(),camera=new Camera(field),play=makePlay();
+    camera.resize(width,height);camera.followPlay(play,0);
+    const before={x:camera.x,y:camera.y,zoom:camera.zoom};
+    play.kickKind='fieldGoal';play.phase='dead';camera.followPlay(play,0);
+    assert.deepEqual({x:camera.x,y:camera.y,zoom:camera.zoom},before,'entering the kick does not snap the camera');
+    for(let i=0;i<240;i++)camera.followPlay(play,dt);
+    const topLeft=camera.worldToScreen({x:field.width-109,y:field.height/2-274});
+    const barRight=camera.worldToScreen({x:field.width+99,y:field.height/2-100});
+    assert.ok(topLeft.x>=0&&barRight.x<=width,'both uprights stay on screen');
+    assert.ok(barRight.x-topLeft.x>=Math.min(170,width*.32),'posts have a substantial visible width');
+    assert.ok(topLeft.y>0&&barRight.y<height*.53,'the target stays above the timing panel');
+    play.reset();assert.equal(play.kickKind,null);
+  }
+});

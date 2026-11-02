@@ -8,7 +8,7 @@ import { clockDecision } from './ClockStrategy.js';
 
 export class MatchController {
   constructor(play, random = Math.random, { cpuOnly = false } = {}) {
-    this.cpuOnly = cpuOnly;
+    this.cpuOnly = cpuOnly; this.random = random;
     this.play = play; this.rules = new MatchRules(random); this.opponent = new Opponent(random);
     this.phaseAge = 0; this.lastPhase = this.rules.phase;
     this.selectedPlayId = DEFAULT_PLAY; this.meter = null; this.returns = new KickoffReturn(play);
@@ -16,6 +16,7 @@ export class MatchController {
   }
   get humanTurn() { return !this.cpuOnly && this.rules.possession === 'home'; }
   resetStrategy() {
+    this.audiblesRemaining = 0; this.playSelectionKey = null;
     this.selectedFormation = 'play'; this.selectedMotion = 'none'; this.throwDepth = 'auto'; this.tempo = 'normal';
     this.defensiveCall = 'man'; this.defensiveAdjustment = 'balanced'; this.cpuCoverage = 'man'; this.cpuAdjustment = 'balanced';
   }
@@ -27,6 +28,14 @@ export class MatchController {
       this.cpuAdjustment = this.rules.yardsToGo <= 3 ? 'box' : this.rules.yardsToGo >= 15 ? 'cushion' : 'balanced';
     }
     if (this.cpuOnly) { this.defensiveCall = this.cpuCoverage; this.defensiveAdjustment = this.cpuAdjustment; }
+    if (this.humanTurn) {
+      const key = `${this.rules.possession}:${this.rules.playNumber}:${this.rules.down}:${this.rules.spot}`;
+      if (key !== this.playSelectionKey) {
+        this.playSelectionKey = key;
+        this.selectedPlayId = PLAYBOOK[Math.min(PLAYBOOK.length - 1, Math.max(0, Math.floor(this.random() * PLAYBOOK.length)))].id;
+        this.audiblesRemaining = 2;
+      }
+    } else { this.playSelectionKey = null; this.audiblesRemaining = 0; }
     const id = this.humanTurn ? this.selectedPlayId : this.opponent.selectPlay(this.rules, this.defensiveCall);
     this.configurePlay(id);
     this.opponent.reset(); this.phaseAge = 0;
@@ -39,7 +48,10 @@ export class MatchController {
     });
   }
   selectPlay(id) {
-    if (this.rules.phase !== 'ready' || !this.humanTurn || !getPlay(id)) return false;
+    if (this.rules.phase !== 'ready' || this.rules.clock <= 0 || !this.humanTurn || !getPlay(id)) return false;
+    if (id === this.selectedPlayId) return true;
+    if (this.audiblesRemaining <= 0) return false;
+    this.audiblesRemaining--;
     this.selectedPlayId = id;
     this.configurePlay(id);
     return true;
@@ -90,6 +102,7 @@ export class MatchController {
     return true;
   }
   audible(direction) {
+    if (direction !== -1 && direction !== 1) return false;
     const index = PLAYBOOK.findIndex(call => call.id === this.selectedPlayId);
     return this.selectPlay(PLAYBOOK[(index + direction + PLAYBOOK.length) % PLAYBOOK.length].id);
   }
@@ -121,6 +134,7 @@ export class MatchController {
     const side = kind === 'kickoff' ? 'home' : this.rules.possession;
     const specialist = this.rules.specialists?.[side]?.[kind === 'punt' ? 'punter' : 'kicker'];
     if (specialist) this.play.qb.bindData(specialist);
+    this.play.kickKind = kind;
     this.play.phase = 'dead'; this.play.ball.attach(this.play.qb);
     return true;
   }
@@ -147,6 +161,7 @@ export class MatchController {
     if (extra) p.configure(85, this.rules.possession, 100);
     const specialist = r.specialists?.[r.possession]?.[kind === 'punt' ? 'punter' : 'kicker'];
     if (specialist) p.qb.bindData(specialist);
+    p.kickKind = kind;
     p.phase = 'dead'; p.carrier = null;
     const target = kind === 'punt' ? { x: Math.min(p.field.width - 20, p.field.endZone + this.rules.kick.landing * p.field.yard), y: p.field.height / 2 } : { x: p.field.width - 20, y: p.field.height / 2 + (this.rules.kick.good ? 0 : 140) };
     p.ball.throw(p.qb, target, 3);
