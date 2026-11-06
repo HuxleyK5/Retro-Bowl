@@ -26,7 +26,7 @@ try {
   });
   const fixture = () => page.evaluate(async () => {
     const { match, play, renderer, state, audio, loop, camera } = await import('/src/main.js');
-    state.set('playing'); match.start(60, false); match.selectPlay('go');
+    state.set('playing'); match.start(60, false); match.configurePlay('go');
     renderer.resetPresentation(); audio.reset(play, match.rules); play.random = () => .99;
     for (const defender of play.defenders) { defender.x = play.field.width - 400; defender.y = play.field.height - 70; defender.vx = defender.vy = 0; }
     camera.follow(play.controlled, 0, true); loop.render();

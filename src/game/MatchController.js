@@ -2,7 +2,7 @@ import { KickMeter } from './KickMeter.js';
 import { KickoffReturn } from './KickoffReturn.js';
 import { MatchRules } from './MatchRules.js';
 import { Opponent } from './Opponent.js';
-import { DEFAULT_PLAY, PLAYBOOK, FORMATIONS, getPlay } from '../football/Playbook.js';
+import { DEFAULT_PLAY, PLAYBOOK, FORMATIONS } from '../football/Playbook.js';
 import { COVERAGES, DEFENSIVE_ADJUSTMENTS, THROW_DEPTHS, chooseCpuCoverage, configureDefense } from '../football/Tactics.js';
 import { clockDecision } from './ClockStrategy.js';
 
@@ -41,20 +41,12 @@ export class MatchController {
     this.opponent.reset(); this.phaseAge = 0;
   }
   configurePlay(id = this.selectedPlayId) {
+    if (this.humanTurn) this.selectedPlayId = id;
     this.play.configure(this.rules.spot, this.rules.possession, this.rules.firstDownLine, id, {
       formation: this.humanTurn ? this.selectedFormation : 'play', motion: this.humanTurn ? this.selectedMotion : 'none',
       coverage: this.humanTurn ? this.cpuCoverage : this.defensiveCall,
       adjustment: this.humanTurn ? this.cpuAdjustment : this.defensiveAdjustment,
     });
-  }
-  selectPlay(id) {
-    if (this.rules.phase !== 'ready' || this.rules.clock <= 0 || !this.humanTurn || !getPlay(id)) return false;
-    if (id === this.selectedPlayId) return true;
-    if (this.audiblesRemaining <= 0) return false;
-    this.audiblesRemaining--;
-    this.selectedPlayId = id;
-    this.configurePlay(id);
-    return true;
   }
   tactic(name, value) {
     const r = this.rules;
@@ -101,10 +93,13 @@ export class MatchController {
     this.phaseAge = 0;
     return true;
   }
-  audible(direction) {
-    if (direction !== -1 && direction !== 1) return false;
-    const index = PLAYBOOK.findIndex(call => call.id === this.selectedPlayId);
-    return this.selectPlay(PLAYBOOK[(index + direction + PLAYBOOK.length) % PLAYBOOK.length].id);
+  audible() {
+    if (this.rules.phase !== 'ready' || this.rules.clock <= 0 || !this.humanTurn || this.audiblesRemaining <= 0) return false;
+    const choices = PLAYBOOK.filter(call => call.id !== this.selectedPlayId);
+    const index = Math.min(choices.length - 1, Math.max(0, Math.floor(this.random() * choices.length)));
+    this.audiblesRemaining--;
+    this.configurePlay(choices[index].id);
+    return true;
   }
   advance() {
     const r = this.rules;
@@ -172,7 +167,7 @@ export class MatchController {
     if (Object.hasOwn(depths, action)) { this.tactic('throwDepth', depths[action]); return; }
     if (['timeout', 'kneel', 'spike'].includes(action)) { this.tactic(action); return; }
     if (action === 'motionNext') { this.tactic('motion', ['none', 'left', 'right'][(['none', 'left', 'right'].indexOf(this.selectedMotion) + 1) % 3]); return; }
-    if (action === 'audiblePrevious' || action === 'audibleNext') { this.audible(action === 'audibleNext' ? 1 : -1); return; }
+    if (action === 'audiblePrevious' || action === 'audibleNext') { this.audible(); return; }
     if (action === 'snap' || action === 'reset') { if (action === 'snap' || this.rules.phase !== 'live') this.advance(); return; }
     if (!this.humanTurn) return;
     if (action === 'fieldGoal') this.kick('fieldGoal');

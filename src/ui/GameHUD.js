@@ -109,7 +109,7 @@ export class GameHUD {
     this.updateScoreboard(r, paused, playClockActive);
     this.text('state-label', paused ? 'GAME PAUSED' : p.phase === 'loose' ? 'FUMBLE / BALL LOOSE' : `${names[r.phase]}${!this.match.humanTurn && ['ready', 'live', 'kick'].includes(r.phase) ? ' · CPU' : ''}`);
     let notice = r.detail;
-    if (r.phase === 'ready') notice = this.match.humanTurn ? `${p.call?.name || 'Offense'} · ${this.match.audiblesRemaining} audibles left / Q / E · SPACE snap · Play clock keeps running` : `${r.teams.away} is calling a play. Watch your defense work.`;
+    if (r.phase === 'ready') notice = this.match.humanTurn ? `${p.call?.name || 'Offense'} · ${this.match.audiblesRemaining} audibles left / Audible = random play · SPACE snap · Play clock keeps running` : `${r.teams.away} is calling a play. Watch your defense work.`;
     if (r.phase === 'live') notice = this.match.humanTurn ? p.notice : `${r.teams.away} OFFENSE / Computer-controlled possession`;
     if (r.phase === 'extraPoint') notice = this.match.humanTurn ? 'Untimed extra point · SPACE or the button to kick for +1' : `${r.teams.away} lines up for the extra point.`;
     if (r.phase === 'kick') notice = r.kick.kind === 'punt' ? 'Punt away · No return · Possession changes at the landing spot' : `${r.kick.distance}-yard ${r.kick.kind === 'extraPoint' ? 'extra point' : 'field goal'} attempt…`;
@@ -123,7 +123,7 @@ export class GameHUD {
     if (r.phase === 'final') notice = `FINAL · ${r.teams.home} ${r.score.home} — ${r.score.away} ${r.teams.away} · Start a new game to play again.`;
     if (r.phase === 'ready' && r.detail.includes(' timeout.')) notice = r.detail;
     if (beginner) {
-      if (r.phase === 'ready') notice = this.match.humanTurn ? 'Choose a play, then press Start this play or Space. Start before the play clock reaches 0.' : 'Your defense plays automatically. Watch until your team gets the ball.';
+      if (r.phase === 'ready') notice = this.match.humanTurn ? (this.match.audiblesRemaining ? 'Check your assigned play. Press Start this play or Space, or Audible for a new random play.' : 'Your assigned play is locked. Press Start this play or Space before the play clock reaches 0.') : 'Your defense plays automatically. Watch until your team gets the ball.';
       else if (r.phase === 'result') notice = `${r.detail} ${this.match.humanTurn ? 'Press Continue or Space.' : 'Opponent plays automatically.'}`;
       else notice = guide.tip;
       if (paused) notice = 'Game paused. Press Resume when you are ready.';

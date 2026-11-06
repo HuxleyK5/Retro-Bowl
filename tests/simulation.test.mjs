@@ -1,3 +1,5 @@
+import { GameLoop } from '../src/core/GameLoop.js';
+import { pullTarget } from '../src/input/PullPass.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Player } from '../src/entities/Player.js';
@@ -218,16 +220,16 @@ test('catch instantly turns route momentum forward and ignores inherited QB stee
 });
 
 
-test('play camera opens on scrimmage, widens for routes, holds at catch, and resets next down', () => {
+test('play camera shows both sidelines, follows routes smoothly, and resets next down', () => {
   const field = new Field(), camera = new Camera(field), play = makePlay();
   camera.resize(1000, 500); camera.followPlay(play, 0, true);
   const opening = camera.zoom;
-  assert.ok(camera.width / opening <= 700, 'opening view covers the pocket');
-  assert.ok(Math.abs(camera.x - play.lineOfScrimmage) < 150);
+  assert.ok(camera.worldToScreen({x:play.lineOfScrimmage,y:0}).y > 0);
+  assert.ok(camera.worldToScreen({x:play.lineOfScrimmage,y:field.height}).y < camera.height);
   play.snap();
   play.receivers[0].x = play.lineOfScrimmage + 800;
   for (let i = 0; i < 180; i++) camera.followPlay(play, dt);
-  assert.ok(camera.zoom < opening * .8, 'downfield routes widen the view');
+  assert.ok(camera.zoom <= opening, 'deep routes never crop the sidelines');
   for (const point of [play.qb, play.receivers[0]]) {
     const screen = camera.worldToScreen(point);
     assert.ok(screen.x > 0 && screen.x < camera.width, 'QB and deep receiver stay visible');
@@ -241,19 +243,21 @@ test('play camera opens on scrimmage, widens for routes, holds at catch, and res
   assert.deepEqual({ x: camera.x, y: camera.y, zoom: camera.zoom }, beforeReset, 'next down does not snap the camera');
   camera.followPlay(play, dt);
   assert.ok(Math.abs(camera.zoom - beforeReset.zoom) < .01, 'zoom starts gently');
-  assert.ok(Math.abs(camera.x - beforeReset.x) < 3, 'pan starts gently');
+  assert.ok(Math.abs(camera.x - beforeReset.x) * camera.horizontalZoom < 8, 'pan keeps flowing without a screen-space jump');
   for (let i = 0; i < 240; i++) camera.followPlay(play, dt);
   assert.ok(Math.abs(camera.zoom - opening) < .001, 'next down smoothly restores the close view');
   play.phase = 'running'; play.carrier = play.rb; play.rb.x = play.lineOfScrimmage + 600;
   for (let i = 0; i < 180; i++) camera.followPlay(play, dt);
-  assert.ok(camera.zoom < opening * .8, 'a long run also widens the view');
+  assert.ok(camera.zoom <= opening, 'a long run keeps both sidelines visible');
   play.reset();
   for (const [w, h] of [[320, 520], [1440, 600]]) {
     camera.resize(w, h); camera.followPlay(play, 0, true);
     const point = camera.screenToWorld(camera.worldToScreen(play.qb));
     assert.ok(Math.abs(point.x - play.qb.x) < .001);
     assert.ok(Math.abs(point.y - play.qb.y) < .001);
-    assert.ok(camera.x - w / camera.zoom / 2 >= -field.margin - .001);
+    if (w / camera.horizontalZoom <= field.width + field.margin * 2)
+      assert.ok(camera.x - w / camera.horizontalZoom / 2 >= -field.margin - .001);
+    else assert.equal(camera.x, field.width / 2, 'ultrawide views center the field');
   }
 });
 
@@ -278,7 +282,7 @@ test('camera preserves framing through resize and converges consistently at diff
 
 
 test('scoring kicks ease into a large goalpost view and return to normal framing next down', () => {
-  for (const [width,height] of [[1000,500],[390,550],[320,550]]) {
+  for (const [width,height] of [[1000,500],[390,550],[320,550],[320,330],[740,280]]) {
     const field=new Field(),camera=new Camera(field),play=makePlay();
     camera.resize(width,height);camera.followPlay(play,0);
     const before={x:camera.x,y:camera.y,zoom:camera.zoom};
@@ -288,8 +292,122 @@ test('scoring kicks ease into a large goalpost view and return to normal framing
     const topLeft=camera.worldToScreen({x:field.width-109,y:field.height/2-274});
     const barRight=camera.worldToScreen({x:field.width+99,y:field.height/2-100});
     assert.ok(topLeft.x>=0&&barRight.x<=width,'both uprights stay on screen');
-    assert.ok(barRight.x-topLeft.x>=Math.min(170,width*.32),'posts have a substantial visible width');
+    assert.ok(barRight.x-topLeft.x>=Math.min(170,width*.32,height*.32),'posts have a substantial visible width');
     assert.ok(topLeft.y>0&&barRight.y<height*.53,'the target stays above the timing panel');
     play.reset();assert.equal(play.kickKind,null);
+  }
+});
+
+
+test('both sidelines remain visible before the snap, on deep throws, and during edge runs at every screen size', () => {
+  for (const [width,height] of [[320,480],[960,500],[1440,600],[1920,300]]) {
+    const field=new Field(),camera=new Camera(field),play=makePlay();
+    camera.resize(width,height);camera.followPlay(play,0);
+    const visible=()=>{
+      const top=camera.worldToScreen({x:camera.x,y:0}),bottom=camera.worldToScreen({x:camera.x,y:field.height});
+      assert.ok(top.y>=-.001&&bottom.y<=height+.001,`${width}x${height}: full sideline-to-sideline width`);
+    };
+    visible(); const opening=camera.zoom;
+    const scrimmage=camera.worldToScreen({x:play.lineOfScrimmage,y:play.field.height/2});
+    assert.ok(scrimmage.x>=0&&scrimmage.x<=width,'the line of scrimmage remains visible');
+    assert.equal(camera.horizontalZoom,camera.zoom,'both sidelines fit without stretching the field');
+    const roundTrip=camera.screenToWorld(camera.worldToScreen(play.receivers[0]));
+    assert.ok(Math.abs(roundTrip.x-play.receivers[0].x)<.001&&Math.abs(roundTrip.y-play.receivers[0].y)<.001);
+    play.snap();play.receivers[0].x=play.lineOfScrimmage+900;
+    for(let i=0;i<180;i++){camera.followPlay(play,dt);visible();}
+    if(width===320)assert.ok(camera.zoom<opening*.95,'a deep play still widens the view on a narrow screen');
+    play.phase='running';play.carrier=play.rb;
+    for(const y of [play.rb.radius,field.height-play.rb.radius]){
+      play.rb.y=y;
+      for(let i=0;i<90;i++){camera.followPlay(play,dt);visible();}
+    }
+  }
+});
+
+
+test('mouse pull direction stays aligned with the field at every camera scale', () => {
+  for(const [w,h] of [[1000,500],[390,480],[1920,300]]){
+    const play=makePlay(),camera=new Camera(play.field);camera.resize(w,h);camera.followPlay(play,0);
+    const start={x:180,y:180},pointer={x:80,y:220};
+    const target=pullTarget(play.qb,start,pointer,camera);
+    const screen=camera.worldToScreen(target),origin=camera.worldToScreen(play.qb);
+    const dx=screen.x-origin.x,dy=screen.y-origin.y;
+    assert.ok(dx>0&&dy<0);
+    assert.ok(Math.abs(dx*(-40)-dy*100)<.001,'visual throw direction follows the opposite pull');
+    const roundTrip=camera.screenToWorld(screen);
+    assert.ok(Math.abs(roundTrip.x-target.x)<.001&&Math.abs(roundTrip.y-target.y)<.001);
+  }
+});
+
+
+test('catching or handing off inside the tracking area does not pull the camera toward the runner', () => {
+  const play=makePlay(),camera=new Camera(play.field);camera.resize(1000,500);camera.followPlay(play,0);
+  const x=camera.x,zoom=camera.horizontalZoom;
+  play.phase='running';play.carrier=play.rb;play.rb.x=x+100;play.rb.vx=0;
+  for(let i=0;i<90;i++)camera.followPlay(play,dt);
+  assert.ok(Math.abs(camera.x-x)<.001,'a nearby runner keeps the same shot');
+  assert.ok(camera.horizontalZoom<=zoom+.001,'handoff does not restart a zoom-in');
+  play.rb.x=camera.x+600;
+  for(let i=0;i<180;i++){
+    const before=camera.x;camera.followPlay(play,dt);
+    assert.ok(Math.abs(camera.x-before)*camera.horizontalZoom<=camera.width*.4*dt+.001,'a sudden target change has a bounded pan speed');
+  }
+  assert.ok(camera.x>x+100,'the camera still follows a runner leaving the tracking area');
+});
+
+test('camera renders intermediate positions and keeps aiming aligned with the displayed frame', () => {
+  const play=makePlay(),camera=new Camera(play.field);camera.resize(1000,500);camera.followPlay(play,0);
+  play.snap();play.receivers[0].x+=500;camera.followPlay(play,dt);
+  const simulation={x:camera.x,zoom:camera.zoom,zoomX:camera.horizontalZoom};
+  camera.setRenderAlpha(0);const previous=camera.view.x;
+  camera.setRenderAlpha(.5);const half=camera.view.x;
+  camera.setRenderAlpha(1);const current=camera.view.x;
+  assert.ok(Math.abs(half-(previous+current)/2)<.0001,'camera moves continuously between physics ticks');
+  assert.deepEqual({x:camera.x,zoom:camera.zoom,zoomX:camera.horizontalZoom},simulation,'rendering does not advance camera simulation');
+  camera.setRenderAlpha(.3);
+  const p=play.qb,back=camera.screenToWorld(camera.worldToScreen(p));
+  assert.ok(Math.abs(back.x-p.x)<.001&&Math.abs(back.y-p.y)<.001);
+  camera.setRenderAlpha(null);assert.equal(camera.view,camera);
+});
+
+
+test('high-refresh rendering pans between physics ticks rather than repeating every other camera position', () => {
+  const originalRaf=globalThis.requestAnimationFrame,originalCancel=globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame=()=>0;globalThis.cancelAnimationFrame=()=>{};
+  try{
+    const play=makePlay(),camera=new Camera(play.field);camera.resize(1000,500);camera.followPlay(play,0);
+    play.phase='running';play.carrier=play.rb;play.rb.x=camera.x+450;
+    const samples=[];
+    const loop=new GameLoop(dt=>{play.rb.x+=100*dt;camera.followPlay(play,dt);},alpha=>{camera.setRenderAlpha(alpha);samples.push(camera.view.x);});
+    loop.start();for(let frame=0;frame<240;frame++)loop.frame(frame*1000/120);loop.stop();
+    const tail=samples.slice(-100);
+    for(let i=1;i<tail.length;i++)assert.ok(tail[i]>tail[i-1],'camera advances on frames between simulation updates');
+  }finally{
+    if(originalRaf===undefined)delete globalThis.requestAnimationFrame;else globalThis.requestAnimationFrame=originalRaf;
+    if(originalCancel===undefined)delete globalThis.cancelAnimationFrame;else globalThis.cancelAnimationFrame=originalCancel;
+  }
+});
+
+
+test('the camera holds the pocket on the snap instead of briefly panning backward', () => {
+  const play=makePlay(),camera=new Camera(play.field);camera.resize(1000,500);camera.followPlay(play,0);
+  const initial=camera.x;play.snap();
+  for(let i=0;i<15;i++){play.update(dt);camera.followPlay(play,dt);assert.ok(camera.x>=initial-.001);}
+});
+
+
+test('camera uses the same scale in both directions so field markings cannot stretch', () => {
+  for(const [width,height] of [[390,480],[1000,500],[1920,300]]){
+    const play=makePlay(),camera=new Camera(play.field);camera.resize(width,height);camera.followPlay(play,0);
+    const square=()=>{
+      const origin=camera.worldToScreen({x:camera.x,y:camera.y});
+      const across=camera.worldToScreen({x:camera.x+20,y:camera.y});
+      const down=camera.worldToScreen({x:camera.x,y:camera.y+20});
+      assert.ok(Math.abs((across.x-origin.x)-(down.y-origin.y))<.001,'equal world distances have equal pixel lengths');
+    };
+    square();play.snap();play.receivers[0].x+=700;
+    for(let i=0;i<120;i++){camera.followPlay(play,dt);camera.setRenderAlpha(.5);square();}
+    play.phase='running';play.carrier=play.rb;
+    for(let i=0;i<60;i++){camera.followPlay(play,dt);camera.setRenderAlpha(.5);square();}
   }
 });

@@ -5,7 +5,7 @@ import { Play } from '../src/football/Play.js';
 import { Field } from '../src/world/Field.js';
 
 const still = { x: 0, y: 0 };
-const make = () => { const c = new MatchController(new Play(new Field(), () => .5), () => .5); c.start(120, false); c.selectPlay('slants'); return c; };
+const make = () => { const c = new MatchController(new Play(new Field(), () => .5), () => .5); c.start(120, false); c.configurePlay('slants'); return c; };
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-8, `${actual} should equal ${expected}`);
 const series = r => ({ score: { ...r.score }, down: r.down, spot: r.spot, line: r.firstDownLine,
   possession: r.possession, clock: r.clock, playClock: r.playClock, running: r.clockRunning });

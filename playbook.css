@@ -19,3 +19,7 @@
 @media(prefers-reduced-motion:reduce){.playbook .play-grid button{transition:none}}
 
 #audible-count{margin:0 0 12px;padding:9px 10px;border:1px solid #738563;color:#d8ed9d;background:#23362b;font:10px/1.6 monospace}
+
+.playbook #audible-button{display:block;width:100%;min-height:44px;margin:12px 0 8px;padding:12px 10px;background:#2d402e;border:2px solid #a3bc77;color:#e6efcc;font:bold 11px monospace;letter-spacing:.5px}.playbook #audible-button:hover:not(:disabled){background:#415838}.playbook #audible-button:disabled{opacity:.45;cursor:default}
+
+@media(min-width:651px) and (max-width:1000px){.playbook{align-items:start}.playbook .playbook-selected{grid-row:2/5}.playbook #audible-count{grid-column:2;grid-row:2}.playbook #audible-button{grid-column:2;grid-row:3;margin-top:0}.playbook #playbook-snap{grid-column:2;grid-row:4;align-self:start}}

@@ -24,7 +24,7 @@ export class GameLoop {
       this.update(this.step);
       this.accumulator -= this.step;
     }
-    this.render();
+    this.render(this.accumulator / this.step);
     this.frameId = requestAnimationFrame(this.frame);
   }
 }

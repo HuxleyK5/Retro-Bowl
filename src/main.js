@@ -64,7 +64,7 @@ const action = name => {
     if (match.rules.phase === 'ready') match.snap();
     return match.rules.phase === 'live' && play.phase === 'passing' && play.call?.type !== 'run';
   }
-  const target = name === 'throw' ? pullTarget(play.qb, input.drag, input.pointer) : camera.screenToWorld(input.pointer);
+  const target = name === 'throw' ? pullTarget(play.qb, input.drag, input.pointer, camera.view) : camera.screenToWorld(input.pointer);
   if (name === 'throw' && !target) return;
   match.action(name, input.movement, target);
   canvas.focus({ preventScroll: true });
@@ -79,8 +79,8 @@ const ratings = new RatingsPanel(play, state, () => {
   document.querySelector(screen ? '#screen-action' : '#game').focus({ preventScroll: true });
 });
 const kickMeter = new KickMeterPanel(match, () => action('snap'));
-const playbook = new PlaybookPanel(match, id => {
-  if (!state.playing || !match.selectPlay(id)) return;
+const playbook = new PlaybookPanel(match, () => {
+  if (!state.playing || !match.audible()) return;
   input.clear(); camera.followPlay(play, 0); canvas.focus({ preventScroll: true });
 }, () => action('snap'));
 const strategy = new StrategyPanel(document.querySelector('#strategy-panel'), match, (name, value) => {
@@ -143,12 +143,13 @@ const loop = new GameLoop(dt => {
   renderer.updateEffects(dt, play, match.rules);
   audio.update(dt, play, match.rules);
   camera.followPlay(play, dt);
-}, () => {
-  if (attract.active) { attract.render(); return; }
+}, (alpha = null) => {
+  if (attract.active) { attract.render(alpha); return; }
+  if (alpha === null || state.playing && !selecting && !inHub) camera.setRenderAlpha(alpha);
   const canHold = input.drag && state.playing && match.humanTurn && match.rules.phase === 'live' && play.phase === 'passing' && play.call?.type !== 'run';
   if (!canHold) input.cancelDrag();
   const canAim = canHold && play.canThrow;
-  const target = canAim ? pullTarget(play.qb, input.drag, input.pointer) : null;
+  const target = canAim ? pullTarget(play.qb, input.drag, input.pointer, camera.view) : null;
   const aim = target ? play.aim(target, match.throwDepth) : null;
   const selected = match.humanTurn && play.phase !== 'flight' && match.rules.phase !== 'kick' ? play.controlled : null;
   renderer.render(play.players, selected, play, aim);

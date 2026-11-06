@@ -93,32 +93,35 @@ test('two audibles change the play without resetting downs, clocks, score or fie
   const m = new MatchController(new Play(new Field()), () => .4); m.start(60, false); m.rules.tick(7);
   const initial = m.selectedPlayId, before = JSON.stringify(m.rules);
   assert.equal(m.audiblesRemaining, 2);
-  assert.equal(m.selectPlay(initial), true); assert.equal(m.audiblesRemaining, 2);
-  assert.equal(m.selectPlay('not-a-play'), false); assert.equal(m.audiblesRemaining, 2);
   assert.equal(m.audible(1), true); assert.equal(m.audiblesRemaining, 1);
   assert.equal(m.audible(-1), true); assert.equal(m.selectedPlayId, initial); assert.equal(m.audiblesRemaining, 0);
   const paths = JSON.stringify(m.play.receivers.map(p => p.route));
-  assert.equal(m.audible(1), false); assert.equal(m.selectPlay('curls'), false);
+  assert.equal(m.audible(), false);
   assert.equal(JSON.stringify(m.rules), before); assert.equal(JSON.stringify(m.play.receivers.map(p => p.route)), paths);
   m.prepare(); assert.equal(m.audiblesRemaining, 0, 're-preparing the same down cannot refund audibles');
   m.tactic('timeout'); assert.equal(m.audiblesRemaining, 0, 'timeouts cannot refund audibles');
-  m.snap(); assert.equal(m.selectPlay('go'), false); assert.equal(m.audible(1), false);
+  m.snap(); assert.equal(m.audible(), false);
 });
 
-test('random assignments cover the whole playbook and clicking a different play spends an audible', () => {
+test('assignments and audibles are random, and every audible excludes the current play', () => {
   for (let i = 0; i < PLAYBOOK.length; i++) {
     const m = new MatchController(new Play(new Field()), () => (i + .1) / PLAYBOOK.length);
     m.start(60, false); assert.equal(m.selectedPlayId, PLAYBOOK[i].id); assert.equal(m.audiblesRemaining, 2);
-    const alternate = PLAYBOOK[(i + 1) % PLAYBOOK.length];
-    assert.equal(m.selectPlay(alternate.id), true); assert.equal(m.play.call, alternate); assert.equal(m.audiblesRemaining, 1);
-    m.prepare(); assert.equal(m.selectedPlayId, alternate.id); assert.equal(m.audiblesRemaining, 1);
+    const initial = m.selectedPlayId;
+    m.random = () => .999; assert.equal(m.audible(), true);
+    const expected = PLAYBOOK.filter(call => call.id !== initial).at(-1);
+    assert.equal(m.play.call, expected); assert.notEqual(m.selectedPlayId, initial); assert.equal(m.audiblesRemaining, 1);
+    m.prepare(); assert.equal(m.selectedPlayId, expected.id); assert.equal(m.audiblesRemaining, 1);
+    m.random = () => 0; assert.equal(m.audible(), true);
+    assert.notEqual(m.selectedPlayId, expected.id); assert.equal(m.audiblesRemaining, 0);
+    assert.equal(m.audible(), false);
   }
 });
 
 test('each new human down assigns a random call and two audibles, CPU still uses its own playbook', () => {
-  const m = new MatchController(new Play(new Field()), () => .4); m.start(60, false); m.selectPlay('curls');
+  const m = new MatchController(new Play(new Field()), () => .4); m.start(60, false); m.audible();
   m.snap(); m.rules.completePlay({type:'INCOMPLETE',spot:25}); m.advance(); assert.equal(m.play.call.id, 'go'); assert.equal(m.audiblesRemaining, 2);
-  m.rules.changePossession(25); m.prepare(); assert.ok(getPlay(m.play.call.id)); assert.equal(m.selectPlay('sweep'), false);
+  m.rules.changePossession(25); m.prepare(); assert.ok(getPlay(m.play.call.id)); assert.equal(m.audible(), false);
   for (const call of PLAYBOOK) {
     const p = make(call.id, false); const coach = new Opponent(() => .4); p.snap();
     for (let i = 0; i < 200 && p.live; i++) p.update(dt, coach.movement(p));

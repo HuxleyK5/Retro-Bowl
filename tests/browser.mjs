@@ -37,19 +37,19 @@ try {
       state.set('playing'); match.start(60, false);
       Object.assign(match.rules, { down: f.down, quarter: f.quarter, clock: f.clock, playClock: f.playClock });
       match.rules.newSeries(f.spot); match.rules.down = f.down; match.prepare();
-      match.cpuAdjustment = 'cushion'; match.selectPlay('go');
+      match.cpuAdjustment = 'cushion'; match.configurePlay('go');
     }, { spot, down, quarter, clock, playClock });
     await page.locator('#game').focus(); await page.waitForTimeout(80);
   };
 
   assert.equal((await snapshot()).phase, 'pregame');
   await page.screenshot({ path: 'test-results/phase3-start.png', fullPage: true });
-  await page.selectOption('#quarter-length', '60'); await page.locator('#screen-action').click(); await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.start(60,false);match.cpuAdjustment='cushion';match.selectPlay('slants');loop.render()});
+  await page.selectOption('#quarter-length', '60'); await page.locator('#screen-action').click(); await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.start(60,false);match.cpuAdjustment='cushion';match.configurePlay('slants');loop.render()});
   await waitFor(s => s.phase === 'ready'); assert.equal((await snapshot()).spot, 25);
   assert.equal(await page.locator('#down-distance').innerText(), '1ST & 10'); assert.equal(await page.locator('#game-clock').innerText(), '1:00');
   // Exercise a touchdown from the red zone against a cushion look; coverage now contains long runouts.
-  await page.evaluate(async () => { const { match, loop } = await import('/src/main.js'); match.rules.newSeries(85); match.prepare(); match.cpuAdjustment = 'cushion'; match.selectPlay('outs'); loop.render(); });
-  await page.locator('[data-play="outs"]').click();
+  await page.evaluate(async () => { const { match, loop } = await import('/src/main.js'); match.rules.newSeries(85); match.prepare(); match.cpuAdjustment = 'cushion'; match.configurePlay('outs'); loop.render(); });
+  await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.configurePlay('outs');loop.render()});
   await key('Space'); await page.waitForTimeout(700);
   const receiver = await page.evaluate(async () => { const p = (await import('/src/main.js')).play.receivers[0]; return { x: p.x, y: p.y }; });
   await clickWorld(receiver); await waitFor(s => s.playPhase === 'flight');
@@ -83,7 +83,7 @@ try {
 
   for (const [width, height] of [[960, 720], [1920, 1080], [540, 800]]) {
     await fixture(); await page.setViewportSize({ width, height }); await page.waitForTimeout(100);
-    await page.locator('[data-play="outs"]').click();
+    await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.configurePlay('outs');loop.render()});
     const size = await page.locator('#game').evaluate(c => ({ width: c.width, height: c.height, cssWidth: c.clientWidth, cssHeight: c.clientHeight, overflow: document.documentElement.scrollWidth > innerWidth }));
     assert.equal(size.width, size.cssWidth); assert.equal(size.height, size.cssHeight); assert.equal(size.overflow, false);
     await page.screenshot({ path: `test-results/phase3-viewport-${width}.png`, fullPage: true });

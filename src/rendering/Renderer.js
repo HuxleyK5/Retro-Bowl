@@ -59,7 +59,7 @@ export class Renderer {
     const primarySlot = play?.previewSlot || (play?.call?.type === 'run' ? '22' : '81');
     for (const player of [...players].sort((a, b) => a.y - b.y)) this.drawPlayer(c, player, player === selected, player === play?.carrier,
       play?.phase === 'presnap' && player.team === 'home' && player.slot === primarySlot);
-    if (play) this.playRenderer.drawBall(c, play.ball, this.effects.reaction(play.carrier)?.lift || 0);
+    if (play) this.playRenderer.drawBall(c, play.ball, this.effects.reaction(play.carrier)?.lift || 0, this.camera.view.zoom / this.camera.view.horizontalZoom);
     this.effects.drawWorld(c);
     c.restore();
     this.stadium.drawLighting(c, this.camera.width, this.camera.height);
@@ -113,10 +113,11 @@ export class Renderer {
     for (const x of [0, end, w - end, w]) for (const y of [-4, h - 4]) { c.fillStyle = '#efae63'; c.fillRect(x - 4, y, 8, 8); }
   }
   drawPlayer(c, p, selected, carrier = false, primary = false) {
+    const camera = this.camera.view;
     const reaction = this.effects.reaction(p);
     c.save(); c.translate(Math.round(p.x + (reaction?.offsetX || 0)), Math.round(p.y + (reaction?.offsetY || 0)));
-    const scale = Math.min(2.1, Math.max(1, .88 / this.camera.zoom));
-    c.scale(scale, scale);
+    const scale = Math.min(2.1, Math.max(1, .88 / camera.zoom));
+    c.scale(scale * camera.zoom / camera.horizontalZoom, scale);
     c.fillStyle = '#0c211c80'; c.beginPath(); c.ellipse(2, 13, 15, 5, 0, 0, Math.PI * 2); c.fill();
     if (selected || carrier) {
       c.fillStyle = selected ? '#dcff7b26' : '#ffd47724';
@@ -138,7 +139,7 @@ export class Renderer {
     if (p.jukeTime > 0) { c.strokeStyle = '#edff9e'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 34, -.7, 1.5); c.stroke(); }
     c.restore();
     if (selected || (p.team === 'home' && p.role !== 'LINEMAN')) {
-      c.save(); c.translate(p.x, p.y - 43 * scale); c.scale(1 / this.camera.zoom, 1 / this.camera.zoom);
+      c.save(); c.translate(p.x, p.y - 43 * scale); c.scale(1 / camera.horizontalZoom, 1 / camera.zoom);
       const label = selected ? `YOU #${p.number}` : primary ? `READ #${p.number}` : p.role === 'QUARTERBACK' ? `QB #${p.number}` : `#${p.number}`;
       c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
       const width = c.measureText(label).width + 10;

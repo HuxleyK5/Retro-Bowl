@@ -10,7 +10,7 @@ Run `npm start` and open http://localhost:5173. Node.js is required. There are n
 
 ## Random plays and audibles
 
-Every new offensive down starts with a random play from the full playbook. You get two audibles per down: press Q / E or choose a different play card to spend one. The counter shows how many changes remain. At zero, the call is locked and you can still snap it. Selecting the current play does not spend an audible. Timeouts and reopening the playbook do not refill the counter; a new down gives you two again.
+Every new offensive down starts with a random play from the full playbook. You cannot select a specific play. Press the **Audible** button (or Q / E) to receive a different random play, up to two times per down. The counter shows how many audibles remain. At zero, the call is locked and you can still snap it. Timeouts and reopening the playbook do not refill the counter; a new down gives you two again.
 
 ## Idle exhibition
 
@@ -18,7 +18,7 @@ After 45 seconds without keyboard, pointer, or scroll activity, a full-screen CP
 
 ## Beginner help
 
-**Beginner help** is on by default and remembers your choice in this browser. The **How to play** guide explains scoring, four tries to gain ten yards, passing, and running. During a game, the coach explains your next step and suggests a play or kick. Start with **Short pass**, **Run through the middle**, or **Long pass**; **More plays** and **More football options** reveal the full controls. You can turn Beginner help off at any time without restarting your game.
+**Beginner help** is on by default and remembers your choice in this browser. The **How to play** guide explains scoring, four tries to gain ten yards, passing, and running. During a game, the coach explains your next step and suggests a play or kick. Start with **Short pass**, **Run through the middle**, or **Long pass**; **Audible** gives you a different random play, up to twice per down. You can turn Beginner help off at any time without restarting your game.
 
 Team and draft screens explain player positions, star ratings, and the annual spending limit. Detailed league tables, player ratings, contracts, and trades remain available in expandable sections. Beginner help changes the interface and instructions; the same match rules and player abilities apply.
 
@@ -67,7 +67,7 @@ Run `node tests/browser-presentation.mjs` with the server running for presentati
 | Input | Action |
 | --- | --- |
 | Space / contextual button | Snap, continue after a play, or kick the extra point |
-| Play buttons / Q and E | Choose a play or cycle audibles before the snap |
+| Audible button / Q and E | Get a different random play before the snap (2 per down) |
 | 0 / 1 / 2 / 3 | Manual aim / short / medium / deep passing depth |
 | M | Cycle receiver motion before the snap |
 | T / Timeout button | Spend one of three timeouts per half to stop the clock between scrimmage plays |

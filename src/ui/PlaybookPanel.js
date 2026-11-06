@@ -1,90 +1,41 @@
-import { PLAYBOOK, FORMATIONS } from '../football/Playbook.js';
-import { COVERAGES } from '../football/Tactics.js';
-import { PLAY_PROFILES, assessPlay, recommendPlays } from '../football/PlayRecommendations.js';
-import { BEGINNER_PLAYS, SIMPLE_PLAY_NAMES, recommendBeginnerAction } from '../game/BeginnerGuide.js';
+import { FORMATIONS } from '../football/Playbook.js';
+import { PLAY_PROFILES } from '../football/PlayRecommendations.js';
+import { SIMPLE_PLAY_NAMES } from '../game/BeginnerGuide.js';
 import { isBeginnerMode } from './BeginnerMode.js';
 
 const roles = { '01': 'QB', '08': 'X', '81': 'Y', '11': 'H', '19': 'Z', '22': 'RB' };
-const pointString = points => points.map(point => point.join(',')).join(' ');
-
-function miniature(call) {
-  const positions = FORMATIONS[call.formation].positions;
-  const primary = PLAY_PROFILES[call.id].primarySlot;
-  const depth = Math.max(30, Math.ceil(Math.max(...Object.values(call.routes).flat().map(point => point[0])) / 10) * 10);
-  const point = ([x, y]) => [Math.round(19 + x / depth * 105), Math.round(29 + y / 27 * 25)];
-  const paths = Object.entries(call.routes).sort(([a], [b]) => (a === primary) - (b === primary));
-  return `<svg class="play-tile-diagram" viewBox="0 0 128 58" aria-hidden="true" focusable="false"><path class="tile-scrimmage" d="M19 3V55"/>${paths.map(([slot, route]) => `<polyline class="${slot === primary ? 'tile-primary' : 'tile-route'}" points="${pointString([positions[slot], ...route].map(point))}"/>`).join('')}${Object.entries(positions).map(([slot, start]) => { const [x, y] = point(start); return `<circle class="${slot === primary ? 'tile-primary-dot' : 'tile-dot'}" cx="${x}" cy="${y}" r="${slot === primary ? 2.4 : 1.7}"/>`; }).join('')}</svg>`;
-}
 
 export class PlaybookPanel {
-  constructor(match, select, snap) {
+  constructor(match, audible, snap) {
     this.match = match; this.root = document.querySelector('#playbook');
     this.stage = document.querySelector('#play-stage');
-    this.audibles = document.createElement('p'); this.audibles.id = 'audible-count';
-    this.audibles.setAttribute('role', 'status'); this.audibles.setAttribute('aria-live', 'polite');
-    this.root.querySelector('.playbook-heading').after(this.audibles);
     this.title = document.querySelector('#call-name'); this.description = document.querySelector('#call-description');
-    this.formation = document.querySelector('#call-formation');
+    this.formation = document.querySelector('#call-formation'); this.formation.hidden = true;
     this.canvas = document.querySelector('#call-preview'); this.canvas.width = 820; this.canvas.height = 440;
     this.snap = document.querySelector('#playbook-snap'); this.snap.addEventListener('click', snap);
-    const selected = document.createElement('section'); selected.className = 'playbook-selected'; selected.setAttribute('aria-label', 'Selected play and primary read');
-    this.root.querySelector('.playbook-heading').after(selected);
+    this.audibles = document.createElement('p'); this.audibles.id = 'audible-count';
+    this.audibles.setAttribute('role', 'status'); this.audibles.setAttribute('aria-live', 'polite');
+    const selected = document.createElement('section'); selected.className = 'playbook-selected';
+    selected.setAttribute('aria-label', 'Assigned play and primary read');
     const chart = document.createElement('div'); chart.className = 'playbook-chart'; chart.append(this.canvas);
-    this.legend = document.createElement('div'); this.legend.className = 'playbook-chart-legend';
-    chart.append(this.legend);
+    this.legend = document.createElement('div'); this.legend.className = 'playbook-chart-legend'; chart.append(this.legend);
     this.read = document.createElement('p'); this.read.id = 'call-primary-read';
-    this.fit = document.createElement('p'); this.fit.id = 'call-fit';
+    this.fit = document.createElement('p'); this.fit.id = 'call-fit'; this.fit.hidden = true;
     selected.append(this.title, this.formation, chart, this.read, this.description, this.fit);
-    const catalog = document.createElement('div'); catalog.className = 'playbook-catalog'; this.root.insertBefore(catalog, this.snap);
-    this.catalog = catalog;
-    for (const id of ['pass-plays', 'run-plays']) {
-      const grid = document.getElementById(id), heading = grid.previousElementSibling;
-      const group = document.createElement('div'); group.className = 'playbook-group'; group.append(heading, grid); catalog.append(group);
-    }
-    this.buttons = PLAYBOOK.map(call => {
-      const button = document.createElement('button'); button.type = 'button'; button.dataset.play = call.id;
-      const profile = PLAY_PROFILES[call.id];
-      button.innerHTML = `<span class="play-tile-copy"><strong>${call.name}</strong><small>${profile.depth}</small><span class="play-fit-badge" hidden>GOOD FIT</span></span>${miniature(call)}`;
-      button.setAttribute('aria-label', `${call.name}. ${profile.strength}`);
-      button.title = call.description; button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => select(call.id));
-      document.querySelector(call.type === 'pass' ? '#pass-plays' : '#run-plays').append(button); return button;
-    });
-    this.starters = document.createElement('div'); this.starters.id = 'beginner-plays'; this.starters.className = 'play-grid beginner-play-calls';
-    this.morePlays = document.createElement('details'); this.morePlays.id = 'beginner-more-plays'; this.morePlays.className = 'beginner-more-plays';
-    this.moreSummary = document.createElement('summary'); this.moreSummary.textContent = 'More plays (9)'; this.morePlays.append(this.moreSummary);
-    this.root.insertBefore(this.starters, catalog); this.root.insertBefore(this.morePlays, catalog);
+    this.root.querySelector('.playbook-heading').after(this.audibles, selected);
+    this.audible = document.createElement('button'); this.audible.id = 'audible-button'; this.audible.type = 'button';
+    this.audible.textContent = 'AUDIBLE / NEW RANDOM PLAY'; this.audible.addEventListener('click', audible);
+    this.audible.setAttribute('aria-describedby', 'audible-count');
+    this.root.insertBefore(this.audible, this.snap);
     this.updateMode();
   }
-
   updateMode() {
     const beginner = isBeginnerMode();
     if (this.beginner === beginner) return;
-    this.beginner = beginner; this.lastContext = null; this.lastCall = null;
-    this.starters.hidden = !beginner;
-    this.moreSummary.hidden = !beginner; this.morePlays.open = !beginner;
-    this.formation.hidden = true; this.fit.hidden = true;
-    this.root.querySelector('.playbook-heading').lastElementChild.textContent = 'Q / E TO CHANGE';
-    this.legend.innerHTML = beginner ? '<span><i class="chart-primary"></i>FIRST TEAMMATE TO LOOK FOR</span><span><i class="chart-los"></i>START LINE</span><span><i class="chart-first"></i>TARGET LINE</span>' : '<span><i class="chart-primary"></i>PRIMARY READ</span><span><i class="chart-los"></i>SCRIMMAGE</span><span><i class="chart-first"></i>FIRST DOWN</span>';
-    for (const button of this.buttons) {
-      const id = button.dataset.play, call = PLAYBOOK.find(call => call.id === id);
-      button.classList.toggle('beginner-play-call', beginner && BEGINNER_PLAYS.includes(id));
-      if (beginner && BEGINNER_PLAYS.includes(id)) this.starters.append(button);
-      else document.querySelector(call.type === 'pass' ? '#pass-plays' : '#run-plays').append(button);
-      const simpleName = SIMPLE_PLAY_NAMES[id];
-      button.querySelector('strong').textContent = beginner && simpleName ? simpleName : call.name;
-      button.querySelector('small').textContent = beginner && simpleName ? (id === 'inside' ? 'No throwing needed' : id === 'go' ? 'More distance, more risk' : 'Quick throw to open space') : PLAY_PROFILES[id].depth;
-      button.setAttribute('aria-label', beginner && simpleName ? `${simpleName}. ${id === 'inside' ? 'The handoff is automatic. Steer with WASD or arrows.' : id === 'go' ? 'Look for an open teammate farther down the field.' : 'Look for a nearby open teammate.'}` : `${call.name}. ${PLAY_PROFILES[id].strength}`);
-    }
-    if (beginner) {
-      BEGINNER_PLAYS.forEach(id => this.starters.append(this.buttons.find(button => button.dataset.play === id)));
-      this.morePlays.append(this.catalog);
-    }
-    else this.root.insertBefore(this.catalog, this.morePlays);
-    this.morePlays.hidden = !beginner;
-    this.snap.textContent = beginner ? 'START THIS PLAY / SPACE' : 'SPACE · SNAP BALL →';
+    this.beginner = beginner; this.lastCall = null;
+    this.legend.innerHTML = beginner ? '<span><i class="chart-primary"></i>FIRST LOOK</span><span><i class="chart-los"></i>START LINE</span><span><i class="chart-first"></i>TARGET LINE</span>' : '<span><i class="chart-primary"></i>PRIMARY READ</span><span><i class="chart-los"></i>SCRIMMAGE</span><span><i class="chart-first"></i>FIRST DOWN</span>';
+    this.snap.textContent = beginner ? 'START THIS PLAY / SPACE' : 'SPACE / SNAP BALL';
   }
-
   update(paused) {
     this.updateMode();
     const visible = this.match.humanTurn && this.match.rules.phase === 'ready';
@@ -92,37 +43,20 @@ export class PlaybookPanel {
     if (!visible) return;
     const play = this.match.play, rules = this.match.rules, call = play.call;
     const formation = play.formation || call.formation, profile = PLAY_PROFILES[call.id]; play.previewSlot = profile.primarySlot;
-    const context = JSON.stringify([rules.down, Math.ceil(rules.yardsToGo), Math.round(rules.spot), rules.quarter,
-      rules.clock <= 10, rules.clock <= Math.min(45, rules.quarterSeconds / 2), rules.clock <= Math.min(90, rules.quarterSeconds * .75), rules.score, play.coverage, play.defensiveAdjustment]);
-    if (context !== this.lastContext) {
-      this.lastContext = context;
-      const suggestion = recommendBeginnerAction(rules, play);
-      const goodFits = new Map((this.beginner ? (suggestion.playId ? [{ id: suggestion.playId }] : []) : recommendPlays(rules, play.coverage, play.defensiveAdjustment)).map(fit => [fit.id, fit]));
-      for (const button of this.buttons) {
-        const fit = goodFits.get(button.dataset.play); button.querySelector('.play-fit-badge').hidden = !fit; button.querySelector('.play-fit-badge').textContent = this.beginner ? 'COACH SUGGESTS' : 'GOOD FIT'; button.classList.toggle('is-good-fit', !!fit);
-        const definition = PLAYBOOK.find(candidate => candidate.id === button.dataset.play);
-        button.title = this.beginner ? button.getAttribute('aria-label') : fit ? `${definition.description} Good fit: ${fit.reason}` : definition.description;
-      }
-    }
     const remaining = this.match.audiblesRemaining;
-    this.root.querySelector('.playbook-heading').lastElementChild.textContent = remaining ? 'Q / E TO CHANGE' : 'PLAY LOCKED';
-    const audibleText = remaining ? `${remaining} AUDIBLE${remaining === 1 ? '' : 'S'} LEFT / Changing your play uses one` : 'NO AUDIBLES LEFT / Play locked';
-    if (this.audibles.textContent !== audibleText) this.audibles.textContent = audibleText;
-    this.buttons.forEach(button => { button.disabled = paused || remaining <= 0; button.setAttribute('aria-pressed', String(button.dataset.play === call.id)); });
-    this.snap.disabled = paused;
-    const motion = play.execution.motion, motionKey = motion ? `${Math.round(motion.player.x / 3)},${Math.round(motion.player.y / 3)}` : '';
-    const fit = assessPlay(call, rules, play.coverage, play.defensiveAdjustment), receiver = play.receivers.find(player => player.slot === profile.primarySlot);
-    const readText = this.beginner ? (call.type === 'run' ? `YOUR RUNNER: #${receiver?.number || profile.primarySlot}. The handoff happens automatically.` : `LOOK FIRST: teammate #${receiver?.number || profile.primarySlot} on the bright green route.`) : `FIRST LOOK  ${profile.read} · #${receiver?.number || profile.primarySlot}`;
-    if (this.read.textContent !== readText) this.read.textContent = readText;
-    const description = this.beginner ? (call.type === 'run' ? 'Use WASD or arrow keys to steer right. Avoid opponents and aim for the yellow line.' : `${call.id === 'play-action' ? 'Wait for the handoff fake to finish. ' : ''}Start the play, then hold the mouse on the field, pull opposite your throw direction and release. Pass to an open teammate.`) : `${profile.strength} ${call.id === 'play-action' ? 'Wait for the 0.9s fake before throwing.' : call.type === 'run' ? 'Follow the highlighted lane or steer after the handoff.' : 'Lime route is the first read; scan the other routes if covered.'}`;
-    if (this.description.textContent !== description) this.description.textContent = description;
-    const fitText = `${COVERAGES[play.coverage]?.name || 'Coverage read'} · ${fit.reason}`;
-    if (this.fit.textContent !== fitText) this.fit.textContent = fitText;
-    if (this.lastCall === call && this.lastFormation === formation && this.lastMotion === motionKey && this.lastChartContext === context) return;
-    this.lastCall = call; this.lastFormation = formation; this.lastMotion = motionKey; this.lastChartContext = context;
+    this.root.querySelector('.playbook-heading').lastElementChild.textContent = remaining ? 'RANDOMLY ASSIGNED' : 'PLAY LOCKED';
+    const text = remaining ? `${remaining} AUDIBLE${remaining === 1 ? '' : 'S'} LEFT / Audible gives you a different random play` : 'NO AUDIBLES LEFT / Start your assigned play';
+    if (this.audibles.textContent !== text) this.audibles.textContent = text;
+    this.audible.disabled = paused || remaining <= 0; this.snap.disabled = paused;
+    const receiver = play.receivers.find(player => player.slot === profile.primarySlot);
+    this.read.textContent = this.beginner ? (call.type === 'run' ? `YOUR RUNNER: #${receiver?.number || profile.primarySlot}. The handoff happens automatically.` : `LOOK FIRST: teammate #${receiver?.number || profile.primarySlot} on the bright green route.`) : `FIRST LOOK / ${profile.read} / #${receiver?.number || profile.primarySlot}`;
+    this.description.textContent = this.beginner ? (call.type === 'run' ? 'Use WASD or arrow keys to steer right. Avoid opponents and aim for the yellow line.' : `${call.id === 'play-action' ? 'Wait for the handoff fake to finish. ' : ''}Start the play, then hold the mouse, pull opposite your throw direction and release to pass.`) : `${profile.strength} ${call.type === 'run' ? 'Follow the highlighted lane or steer after the handoff.' : 'Lime route is the first read; look for an open teammate.'}`;
     this.title.textContent = this.beginner ? (SIMPLE_PLAY_NAMES[call.id] || call.name) : call.name;
-    this.formation.textContent = FORMATIONS[formation].name;
-    this.canvas.setAttribute('aria-label', `${call.name}: ${FORMATIONS[formation].name}. Primary read ${profile.read}. ${call.description}`);
+    const motion = play.execution.motion, motionKey = motion ? `${Math.round(motion.player.x / 3)},${Math.round(motion.player.y / 3)}` : '';
+    const context = `${play.generation}:${formation}:${motionKey}:${rules.yardsToGo}`;
+    if (this.lastCall === call && this.lastChartContext === context) return;
+    this.lastCall = call; this.lastChartContext = context;
+    this.canvas.setAttribute('aria-label', `Assigned play: ${call.name}. Primary read ${profile.read}. ${call.description}`);
     this.draw(call);
   }
 

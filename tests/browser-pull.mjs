@@ -5,7 +5,7 @@ const browser=await chromium.launch({channel:'msedge',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
- await page.goto('http://localhost:5173');await startFranchise(page);await page.locator('#screen-action').click(); await page.evaluate(async()=>{(await import('/src/main.js')).match.start(120,false)});
+ await page.goto('http://localhost:5173');await startFranchise(page);await page.locator('#screen-action').click(); await page.evaluate(async()=>{const{match}=await import('/src/main.js');match.start(120,false);match.configurePlay('slants')});
  // One continuous gesture snaps, survives the disappearing playbook, then throws.
  await page.evaluate(async()=>{const {loop}=await import('/src/main.js');loop.stop();loop.render()});
  await page.locator('#game').scrollIntoViewIfNeeded();
@@ -16,7 +16,7 @@ try {
  await page.mouse.move(sx-100,sy);await page.mouse.up();
  const snapped=await page.evaluate(async()=>{const {play}=await import('/src/main.js');return {phase:play.phase,dx:play.ball.target.x-play.qb.x,dy:play.ball.target.y-play.qb.y}});
  assert.equal(snapped.phase,'flight');assert.ok(snapped.dx>450&&snapped.dx<650);assert.ok(Math.abs(snapped.dy)<40);
- const prepare=async()=>{await page.evaluate(async()=>{const {match,state,loop}=await import('/src/main.js');state.set('playing');match.start(120, false);match.snap();loop.stop();loop.render();});await page.locator('#game').focus();await page.locator('#game').scrollIntoViewIfNeeded();await page.waitForTimeout(80)};
+ const prepare=async()=>{await page.evaluate(async()=>{const {match,state,loop}=await import('/src/main.js');state.set('playing');match.start(120, false);match.configurePlay('slants');match.snap();loop.stop();loop.render();});await page.locator('#game').focus();await page.locator('#game').scrollIntoViewIfNeeded();await page.waitForTimeout(80)};
  const phase=()=>page.evaluate(async()=>(await import('/src/main.js')).play.phase);
  await prepare();const box=await page.locator('#game').boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
  await page.mouse.click(x,y);assert.equal(await phase(),'passing');

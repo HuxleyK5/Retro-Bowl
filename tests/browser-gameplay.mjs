@@ -16,7 +16,7 @@ try {
   await page.waitForTimeout(100);
   const fixture = async () => page.evaluate(async () => {
     const { match, play, renderer, state } = await import('/src/main.js');
-    state.set('playing'); match.start(60, false); match.selectPlay('go');
+    state.set('playing'); match.start(60, false); match.configurePlay('go');
     play.random = () => .99;
     for (const defender of play.defenders) { defender.x = play.field.width - 400; defender.y = play.field.height - 70; defender.vx = defender.vy = 0; }
     renderer.updateEffects(0, play);

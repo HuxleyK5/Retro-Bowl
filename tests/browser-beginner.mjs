@@ -80,31 +80,16 @@ try {
   await expect(page.locator('#playbook')).toBeVisible();
   await expect(page.locator('#beginner-goal')).toHaveText('Gain 10 yards to the yellow line. Try 1 of 4.');
   await expect(page.locator('#beginner-tip')).toContainText('Then you get four new tries.');
-  await expect(page.locator('#beginner-recommendation')).toContainText('Coach suggests:');
+  await expect(page.locator('#beginner-recommendation')).toContainText('The game assigned your play');
   await expect(page.locator('#down-distance')).toHaveText('TRY 1 OF 4 · 10 YD');
-  assert.equal(await page.locator('#beginner-plays [data-play]').count(), 3);
-  assert.equal(await page.locator('#playbook [data-play]').count(), 12);
-  for (const id of ['slants', 'inside', 'go']) {
-    await page.evaluate(async () => { const {match,loop} = await import('/src/main.js'); match.start(120, false); loop.render(); });
-    const button = page.locator(`#beginner-plays [data-play="${id}"]`);
-    await expect(button).toBeVisible();
-    await expect(button.locator('strong')).toHaveText({ slants: 'Short pass', inside: 'Run through the middle', go: 'Long pass' }[id]);
-    await button.click();
-    await render();
-    assert.equal(await page.evaluate(async () => (await import('/src/main.js')).play.call.id), id);
-    await expect(button).toHaveAttribute('aria-pressed', 'true');
-  }
-
-  const more = page.locator('#beginner-more-plays');
-  await expect(more).not.toHaveAttribute('open', '');
-  assert.equal(await more.locator('[data-play]').count(), 9);
-  await expect(more.locator('[data-play="outs"]')).toBeHidden();
-  await more.locator('summary').click();
-  await expect(more.locator('[data-play="outs"]')).toBeVisible();
-  await more.locator('[data-play="outs"]').click();
-  assert.equal(await page.evaluate(async () => (await import('/src/main.js')).play.call.id), 'outs');
-  await more.locator('summary').click();
-
+  await expect(page.locator('#playbook [data-play], #beginner-more-plays')).toHaveCount(0);
+  await expect(page.locator('#audible-button')).toBeVisible();
+  await expect(page.locator('#audible-count')).toContainText('2 AUDIBLES LEFT');
+  await page.locator('#audible-button').click(); await render();
+  await expect(page.locator('#audible-count')).toContainText('1 AUDIBLE LEFT');
+  await page.locator('#audible-button').click(); await render();
+  await expect(page.locator('#audible-button')).toBeDisabled();
+  await expect(page.locator('#beginner-recommendation')).toContainText('Your play is locked');
   await expect(page.locator('#strategy-panel select')).toHaveCount(0);
   await expect(page.locator('#strategy-timeout')).toBeVisible();
   for (const width of [320, 390, 540, 960, 1440]) { await fit(width, 'beginner match'); await render(); }
@@ -118,13 +103,14 @@ try {
   await expect(page.locator('#strategy-formation')).toHaveCount(0);
   await expect(page.locator('#call-formation')).toBeHidden();
   await expect(page.locator('#call-fit')).toBeHidden();
-  assert.equal(await page.locator('#playbook [data-play]:visible').count(), 12);
-  await expect(more.locator('summary')).toBeHidden();
+  await expect(page.locator('#playbook [data-play]')).toHaveCount(0);
+  await expect(page.locator('#audible-button')).toBeDisabled();
   await mode.check();
   await render();
   await expect(page.locator('#beginner-coach')).toBeVisible();
   await expect(page.locator('#strategy-formation')).toHaveCount(0);
-  assert.equal(await page.locator('#playbook [data-play]:visible').count(), 3);
+  await expect(page.locator('#playbook [data-play]')).toHaveCount(0);
+  await expect(page.locator('#audible-button')).toBeDisabled();
 
   await page.evaluate(async () => {
     const { match, loop } = await import('/src/main.js');
@@ -161,5 +147,5 @@ try {
   await expect.poll(async () => (await clocks()).mode).toBe('playing');
 
   assert.deepEqual(errors, []);
-  console.log('PASS: beginner mode enabled by default, persistent mode choices, guided draft and automatic remaining pick, full position names, plain contextual coach, three simple plays, optional full playbook and football controls, mobile fit, live expert switch, help pauses both clocks until explicit resume, zero browser errors.');
+  console.log('PASS: beginner mode enabled by default, persistent mode choices, guided draft and automatic remaining pick, full position names, plain contextual coach, assigned play and random Audible button, no selectable play cards, shared audible limit across help modes, mobile fit, live expert switch, help pauses both clocks until explicit resume, zero browser errors.');
 } finally { await browser.close(); }

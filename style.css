@@ -58,4 +58,4 @@ html:not(.beginner-mode) [data-beginner-only],html.beginner-mode [data-expert-on
 #kick-needle{width:6px;top:-7px;bottom:-7px}
 #kick-lock{min-height:48px;min-width:220px;font-size:13px;padding:12px 20px}
 @media(max-width:540px){.kick-meter{padding:14px 12px;bottom:14px}.kick-meter p{font-size:12px;line-height:1.5}.kick-meter small{font-size:10px}#kick-track{height:36px;margin:17px 8px}#kick-lock{width:100%;min-width:0;font-size:12px}}
-@media(max-height:540px){.kick-meter{padding:9px 12px;bottom:10px}.kick-meter strong{font-size:14px}.kick-meter p{font-size:11px;margin:7px 0}.kick-meter small{display:none}#kick-track{height:28px;margin:12px 8px}#kick-lock{min-height:38px;padding:8px 12px;font-size:11px}}
+@media(max-height:800px){.kick-meter{padding:9px 12px;bottom:10px}.kick-meter strong{font-size:14px}.kick-meter p{font-size:11px;margin:7px 0}.kick-meter small{display:none}#kick-track{height:28px;margin:12px 8px}#kick-lock{min-height:38px;padding:8px 12px;font-size:11px}}

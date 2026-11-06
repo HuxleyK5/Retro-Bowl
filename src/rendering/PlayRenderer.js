@@ -88,14 +88,14 @@ export class PlayRenderer {
     }
     c.restore();
   }
-  drawBall(c, ball, lift = 0) {
+  drawBall(c, ball, lift = 0, aspect = 1) {
     c.save(); c.fillStyle = '#14261f88';
     if (ball.mode === 'loose') {
       c.save(); c.strokeStyle = '#ffe29e'; c.lineWidth = 3; c.setLineDash([7, 6]);
       c.beginPath(); c.ellipse(ball.x, ball.y + 5, 23, 13, 0, 0, Math.PI * 2); c.stroke(); c.restore();
     }
     c.beginPath(); c.ellipse(ball.x, ball.y + 7, 9, 4, 0, 0, Math.PI * 2); c.fill();
-    c.translate(ball.x, ball.y - ball.height - lift);
+    c.translate(ball.x, ball.y - ball.height - lift); c.scale(aspect, 1);
     c.rotate(ball.mode === 'flight' ? ball.elapsed * 14 : ball.mode === 'loose' ? ball.elapsed * 9 : .4);
     c.fillStyle = '#512e21'; c.fillRect(-7, -6, 14, 12); c.fillRect(-10, -3, 20, 6);
     c.fillStyle = '#bb7541'; c.fillRect(-7, -4, 14, 8); c.fillRect(-9, -2, 18, 4);

@@ -13,12 +13,12 @@ try {
   await page.clock.install();
   await page.goto('http://localhost:5173');
   const demo = page.locator('#attract-mode');
-  await page.clock.fastForward(44900);
+  await page.clock.fastForward(44000);
   await expect(demo).toBeHidden();
   await page.mouse.move(50, 50);
-  await page.clock.fastForward(44900);
+  await page.clock.fastForward(44000);
   await expect(demo).toBeHidden();
-  await page.clock.fastForward(200);
+  await page.clock.fastForward(1100);
   await expect(demo).toBeVisible();
   await expect(page.locator('.app')).toHaveAttribute('inert', '');
   await expect(demo).toContainText('CPU vs CPU');

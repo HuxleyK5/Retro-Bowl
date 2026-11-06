@@ -24,5 +24,23 @@ try{
  await setup();await page.keyboard.press('k');await expect(page.locator('#kick-meter-title')).toContainText('PUNT');await lockMeter(page,.4);await wait(s=>s.phase==='result');assert.match((await read()).result,/PUNT/);
  await setup(true);await page.keyboard.press('Space');await expect(page.locator('#kick-meter-title')).toContainText('EXTRA POINT');await lockMeter(page);await wait(s=>s.phase==='result');assert.equal((await read()).score.home,1);
  await setup();await page.keyboard.press('f');await lockMeter(page,1,1);await wait(s=>s.phase==='result');assert.equal((await read()).result,'FIELD GOAL MISSED');assert.equal((await read()).score.home,0);
+ // Check the visible uprights against the actual meter, including short screens.
+ for(const [width,height,name] of [[1440,1100,'desktop'],[390,700,'short-mobile'],[740,360,'landscape']]){
+  await page.setViewportSize({width,height});
+  await page.evaluate(async()=>{const{match,state,loop}=await import('/src/main.js');loop.stop();state.set('playing');match.start(120,false);match.rules.newSeries(75);match.prepare();match.kick('fieldGoal');loop.render()});
+  await page.waitForTimeout(100);
+  const view=await page.evaluate(async()=>{
+   const{camera,play,loop}=await import('/src/main.js');for(let i=0;i<240;i++)camera.followPlay(play,1/60);loop.render();
+   const v=document.querySelector('#viewport').getBoundingClientRect(),m=document.querySelector('#kick-meter').getBoundingClientRect();
+   const top=camera.worldToScreen({x:play.field.width-113,y:play.field.height/2-278});
+   const bar=camera.worldToScreen({x:play.field.width+103,y:play.field.height/2-90});
+   return{top,bar,width:v.width,height:v.height,meter:{left:m.left-v.left,right:m.right-v.left,top:m.top-v.top},overflow:document.documentElement.scrollWidth>innerWidth};
+  });
+  assert.ok(view.top.x>=0&&view.bar.x<=view.width,`${name}: both uprights fit`);
+  assert.ok(view.top.y>=0,`${name}: tops are not clipped`);
+  assert.ok(view.bar.y<view.meter.top||view.top.x>view.meter.right||view.bar.x<view.meter.left,`${name}: timing panel does not hide the target`);
+  assert.equal(view.overflow,false);
+  await page.locator('#viewport').screenshot({path:`test-results/field-goal-${name}.png`});
+ }
  assert.deepEqual(errors,[]);console.log('PASS: opening kickoff, catch/auto-return, steering/sprint/juke, tackle spot and first down, clock/pause, moving kick meter, power/accuracy UI, FG/PAT/punt, kickoff touchback, wide miss, resizing, zero console/network errors.');
 }finally{await browser.close()}

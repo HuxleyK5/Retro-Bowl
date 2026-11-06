@@ -88,8 +88,9 @@ export class AttractMode {
     if (r.phase === 'final' && this.match.phaseAge > 6) { this.newGame(); return; }
     this.renderer.updateEffects(dt, this.play, r); this.camera.followPlay(this.play, dt);
   }
-  render() {
+  render(alpha = null) {
     if (!this.active) return;
+    this.camera.setRenderAlpha(alpha);
     this.renderer.render(this.play.players, null, this.play, null);
     const r = this.match.rules;
     this.labels.score.textContent = `${r.score.home} : ${r.score.away}`;

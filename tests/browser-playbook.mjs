@@ -23,49 +23,46 @@ try {
     assert.fail(JSON.stringify(await read()));
   };
   const prepare = async () => {
-    await page.evaluate(async () => { const {match,state,play} = await import('/src/main.js'); state.set('playing'); match.start(120, false); match.cpuAdjustment = 'cushion'; match.selectPlay('slants'); play.random = () => .4; });
+    await page.evaluate(async () => { const {match,state,play} = await import('/src/main.js'); state.set('playing'); match.start(120, false); match.cpuAdjustment = 'cushion'; match.configurePlay('slants'); play.random = () => .4; });
     await page.locator('#game').focus(); await page.waitForTimeout(80);
   };
-  assert.equal(await page.locator('[data-play]').count(), 12);
-  const before = await read(); const signatures = [];
-  for (const id of ['slants','outs','curls','posts','go','crosses','screen','play-action','inside','outside','sweep','draw']) {
-    await prepare();
-    await page.locator(`[data-play="${id}"]`).click();
-    await waitFor(v => v.id === id); await page.waitForTimeout(30);
-    assert.equal(await page.locator(`[data-play="${id}"]`).getAttribute('aria-pressed'), 'true');
-    const v = await read(); assert.equal(v.down, before.down); assert.equal(v.spot, before.spot); assert.equal(v.clock, before.clock);
-    assert.ok(v.playClock <= before.playClock); signatures.push(JSON.stringify(v.routes));
-  }
-  assert.equal(new Set(signatures).size, 12);
-  await page.evaluate(async () => {
-    const { match, loop } = await import('/src/main.js');
-    const random = match.random; match.random = () => .999; match.start(120, false); match.random = random; loop.render();
-  });
+  await prepare();
+  await expect(page.locator('[data-play], #beginner-more-plays, #pass-plays, #run-plays')).toHaveCount(0);
+  await expect(page.locator('#audible-button')).toBeVisible();
   await expect(page.locator('#audible-count')).toContainText('2 AUDIBLES LEFT');
-  await page.locator('#game').focus();
-  await page.keyboard.press('e'); await waitFor(v => v.id === 'slants');
-  assert.equal((await read()).audibles, 1);
-  await page.keyboard.press('q'); await waitFor(v => v.id === 'draw');
-  assert.equal((await read()).audibles, 0);
-  await expect(page.locator('#audible-count')).toContainText('NO AUDIBLES LEFT');
-  await expect(page.locator('[data-play="crosses"]')).toBeDisabled();
+  const before = await read();
+  await page.evaluate(async () => { (await import('/src/main.js')).match.random = () => .7; });
+  await page.locator('#audible-button').click();
+  await waitFor(v => v.audibles === 1);
+  const first = await read(); assert.notEqual(first.id, before.id);
+  assert.equal(first.down, before.down); assert.equal(first.spot, before.spot); assert.equal(first.clock, before.clock);
+  await page.locator('#audible-button').click(); await waitFor(v => v.audibles === 0);
+  const locked = await read(); assert.notEqual(locked.id, first.id);
+  await expect(page.locator('#audible-button')).toBeDisabled();
   await expect(page.locator('#playbook-snap')).toBeEnabled();
-  await page.keyboard.press('e'); assert.equal((await read()).id, 'draw');
+  await page.locator('#game').focus(); await page.keyboard.press('e'); assert.equal((await read()).id, locked.id);
+  await expect(page.locator('#audible-count')).toContainText('NO AUDIBLES LEFT');
+  await page.screenshot({path:'test-results/random-audibles.png',fullPage:true});
   await page.evaluate(async () => {
     const { match, loop } = await import('/src/main.js');
     match.snap(); match.play.finish('INCOMPLETE'); match.rules.completePlay(match.play.outcome); match.advance(); loop.render();
   });
   await expect(page.locator('#audible-count')).toContainText('2 AUDIBLES LEFT');
-  await expect(page.locator('[data-play="crosses"]')).toBeEnabled();
-  await page.locator('[data-play="crosses"]').click();
-  await expect(page.locator('#call-formation')).toHaveText('Bunch right');
-  await page.screenshot({path:'test-results/phase4-playbook.png',fullPage:true});
-  await page.keyboard.press('Escape'); await expect(page.locator('[data-play="go"]')).toBeDisabled();
+  await expect(page.locator('#audible-button')).toBeEnabled();
+  // Keyboard shortcuts use the same random roll as the button, never list order.
+  await prepare();
+  await page.evaluate(async () => { (await import('/src/main.js')).match.random = () => .999; });
+  await page.locator('#game').focus(); await page.keyboard.press('e'); await waitFor(v => v.audibles === 1);
+  assert.equal((await read()).id,'draw');
+  await page.evaluate(async () => { (await import('/src/main.js')).match.random = () => 0; });
+  await page.keyboard.press('q'); await waitFor(v => v.audibles === 0); assert.equal((await read()).id,'slants');
+  await prepare();
+  await page.keyboard.press('Escape'); await expect(page.locator('#audible-button')).toBeDisabled();
   const paused = await read(); await page.keyboard.press('e'); await page.waitForTimeout(100);
-  assert.equal((await read()).id, paused.id); assert.equal((await read()).playClock, paused.playClock);
+  assert.equal((await read()).id,paused.id);assert.equal((await read()).audibles,paused.audibles);
   await page.keyboard.press('Escape');
   for (const id of ['inside','outside','sweep','draw']) {
-    await prepare(); await page.locator(`[data-play="${id}"]`).click();
+    await prepare(); await page.evaluate(async id=>{const{match,loop}=await import('/src/main.js');match.configurePlay(id);loop.render()},id);
     await page.locator('#playbook-snap').click(); await expect(page.locator('#playbook')).toBeHidden();
     await waitFor(v => v.carrierId === v.rbId);
     assert.equal((await read()).playPhase, 'running'); assert.equal((await read()).canThrow, false);
@@ -76,16 +73,16 @@ try {
       await page.screenshot({path:'test-results/phase4-outside-run.png',fullPage:true});
     }
   }
-  await prepare(); await page.locator('[data-play="play-action"]').click(); await page.keyboard.press('Space');
+  await prepare(); await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.configurePlay('play-action');loop.render()}); await page.keyboard.press('Space');
   assert.equal((await read()).canThrow, false); const afterFake = await waitFor(v => v.canThrow); assert.equal(afterFake.carrierId, afterFake.qbId);
-  await prepare(); await page.locator('[data-play="screen"]').click(); await page.keyboard.press('Space');
+  await prepare(); await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.configurePlay('screen');loop.render()}); await page.keyboard.press('Space');
   await page.waitForTimeout(1000);
   const target = await page.evaluate(async () => { const {play}=await import('/src/main.js');return {x:play.rb.x,y:play.rb.y}; });
   await pullPass(page,target); const afterCatch = await waitFor(v => v.playPhase === 'running'); assert.equal(afterCatch.carrierId, afterCatch.rbId);
   for (const [width,height] of [[960,720],[540,800]]) {
     await prepare(); await page.setViewportSize({width,height}); await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-    await page.locator('[data-play="sweep"]').click(); assert.equal((await read()).id,'sweep');
+    await page.evaluate(async()=>{const{match,loop}=await import('/src/main.js');match.configurePlay('sweep');loop.render()}); assert.equal((await read()).id,'sweep');
     await page.screenshot({path:`test-results/phase4-playbook-${width}.png`,fullPage:true});
     await page.locator('#playbook-snap').click(); await waitFor(v => v.carrierId === v.rbId);
   }
@@ -94,5 +91,5 @@ try {
   await page.waitForTimeout(100); assert.equal(await page.locator('#playbook').isVisible(),false);
   const cpu = await read(); await page.keyboard.press('e'); assert.equal((await read()).id,cpu.id);
   assert.deepEqual(errors,[]);
-  console.log('PASS: all 12 UI choices, distinct previews, formation changes, Q/E audibles, clocks preserved, pause/live/CPU lockout, all run exchanges, manual steering, play-action delay, screen completion, desktop/narrow layouts, zero browser errors.');
+  console.log('PASS: random assigned play, no manual play selection, random Audible button and Q/E, shared two-audible limit, next-down reset, clocks preserved, pause/live/CPU lockout, all run exchanges, manual steering, play-action delay, screen completion, desktop/narrow layouts, zero browser errors.');
 } finally { await browser.close(); }
