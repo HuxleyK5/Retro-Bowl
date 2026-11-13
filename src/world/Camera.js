@@ -9,12 +9,14 @@ const ease = (value, target, velocity, rate, dt) => {
 export class Camera {
   constructor(field) { this.field = field; this.x = field.width / 2; this.y = field.height / 2; this.zoom = 1; this.width = 1; this.height = 1; }
   get view() { return this.renderPose || this; }
+  get frameWidth() { return this.framingWidth ?? this.width; }
   setRenderAlpha(alpha = null) {
     if (alpha === null || !this.previousPose) { this.renderPose = null; return; }
     const t = Math.max(0, Math.min(1, alpha)), previous = this.previousPose;
     const mix = key => previous[key] + (this[key] - previous[key]) * t;
     this.renderPose = { x: mix('x'), y: mix('y'), zoom: mix('zoom'), zoomX: mix('zoomX') };
     this.renderPose.horizontalZoom = this.renderPose.zoomX;
+    this.renderPose.frameWidth = previous.frameWidth + (this.frameWidth - previous.frameWidth) * t;
   }
   get horizontalZoom() { return this.zoomX ?? this.zoom; }
   resize(width, height) {
@@ -36,7 +38,7 @@ export class Camera {
     this.x += (x - this.x) * blend; this.y += (y - this.y) * blend;
   }
   followPlay(play, dt, immediate = false) {
-    if (dt > 0) this.previousPose = { x: this.x, y: this.y, zoom: this.zoom, zoomX: this.horizontalZoom };
+    if (dt > 0) this.previousPose = { x: this.x, y: this.y, zoom: this.zoom, zoomX: this.horizontalZoom, frameWidth: this.frameWidth };
     const fresh = this.playGeneration !== play.generation;
     this.playGeneration = play.generation;
     const ballLive = ['flight', 'loose'].includes(play.ball.mode);
@@ -61,7 +63,7 @@ export class Camera {
       else {
         // Keep the current shot through catches and handoffs. Pan only when
         // the runner reaches the edges of a comfortable tracking area.
-        const half = this.width / this.horizontalZoom / 2;
+        const half = this.frameWidth / this.horizontalZoom / 2;
         const left = this.x - half * .5, right = this.x + half * .4;
         x = focus.x < left ? focus.x + half * .5 : focus.x > right ? focus.x - half * .4 : this.x;
         if (play.phase === 'dead' && !ballLive) x = this.x;
@@ -87,19 +89,24 @@ export class Camera {
     const targetZoomX = Math.max(floor, this.playZoom);
     // One scale for both axes keeps the field and yard numbers in proportion.
     const targetZoom = scoringKick ? targetZoomX : Math.min(targetZoomX, sidelineZoom);
+    // A centered window limits downfield distance without distorting the turf.
+    // Expand it with the routes; scoring kicks retain their full-width shot.
+    const targetFrameWidth = scoringKick ? this.width : Math.min(this.width, this.width / targetZoomX * targetZoom);
     if (snap) {
       this.zoom = targetZoom; this.zoomX = targetZoom; this.zoomVelocity = 0;
+      this.framingWidth = targetFrameWidth; this.framingVelocity = 0;
     } else {
       [this.zoom, this.zoomVelocity] = ease(this.zoom, targetZoom, this.zoomVelocity || 0, 4.5, dt);
       this.zoomX = this.zoom;
+      [this.framingWidth, this.framingVelocity] = ease(this.frameWidth, targetFrameWidth, this.framingVelocity || 0, 4.5, dt);
     }
     const bound = (value, half, size) => half * 2 >= size + this.field.margin * 2 ? size / 2
       : Math.max(half - this.field.margin, Math.min(size + this.field.margin - half, value));
-    x = bound(x, this.width / this.horizontalZoom / 2, this.field.width);
+    x = bound(x, this.frameWidth / this.horizontalZoom / 2, this.field.width);
     y = bound(y, this.height / this.zoom / 2, this.field.height);
     if (snap) {
       this.x = x; this.y = y; this.xVelocity = this.yVelocity = 0;
-      this.previousPose = { x: this.x, y: this.y, zoom: this.zoom, zoomX: this.horizontalZoom };
+      this.previousPose = { x: this.x, y: this.y, zoom: this.zoom, zoomX: this.horizontalZoom, frameWidth: this.frameWidth };
     } else {
       const [nextX, nextVelocity] = ease(this.x, x, this.xVelocity || 0, 5, dt);
       const trackingSpeed = Math.abs(focus.vx || 0) * 1.15;

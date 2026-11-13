@@ -51,7 +51,10 @@ export class Renderer {
     c.imageSmoothingEnabled = false;
     c.fillStyle = '#1a302b'; c.fillRect(0, 0, this.camera.width, this.camera.height);
     if (play) this.effects.sync(play);
-    c.save(); this.camera.apply(c);
+    c.save();
+    const frameWidth = this.camera.view.frameWidth;
+    c.beginPath(); c.rect((this.camera.width - frameWidth) / 2, 0, frameWidth, this.camera.height); c.clip();
+    this.camera.apply(c);
     this.stadium.drawWorld(c, this.teams, this.effects);
     this.drawField(c);
     if (play) this.playRenderer.drawGuides(c, play, aim);

@@ -255,8 +255,8 @@ test('play camera shows both sidelines, follows routes smoothly, and resets next
     const point = camera.screenToWorld(camera.worldToScreen(play.qb));
     assert.ok(Math.abs(point.x - play.qb.x) < .001);
     assert.ok(Math.abs(point.y - play.qb.y) < .001);
-    if (w / camera.horizontalZoom <= field.width + field.margin * 2)
-      assert.ok(camera.x - w / camera.horizontalZoom / 2 >= -field.margin - .001);
+    if (camera.frameWidth / camera.horizontalZoom <= field.width + field.margin * 2)
+      assert.ok(camera.x - camera.frameWidth / camera.horizontalZoom / 2 >= -field.margin - .001);
     else assert.equal(camera.x, field.width / 2, 'ultrawide views center the field');
   }
 });
@@ -409,5 +409,30 @@ test('camera uses the same scale in both directions so field markings cannot str
     for(let i=0;i<120;i++){camera.followPlay(play,dt);camera.setRenderAlpha(.5);square();}
     play.phase='running';play.carrier=play.rb;
     for(let i=0;i<60;i++){camera.followPlay(play,dt);camera.setRenderAlpha(.5);square();}
+  }
+});
+
+test('scrimmage window excludes the distant end zones and opens smoothly for deep routes', () => {
+  for (const [width,height] of [[390,480],[1000,500],[1920,300]]) {
+    const play=makePlay(),camera=new Camera(play.field);
+    camera.resize(width,height);camera.followPlay(play,0);
+    const opening=camera.frameWidth;
+    assert.ok(camera.frameWidth/camera.horizontalZoom<=680.001,'opening shot shows at most 34 yards');
+    assert.ok(Math.abs(camera.x-play.lineOfScrimmage-70)<.001,'opening shot stays near scrimmage');
+    const assertFramed=point=>{
+      const screen=camera.worldToScreen(point),left=(width-camera.frameWidth)/2;
+      assert.ok(screen.x>=left&&screen.x<=left+camera.frameWidth,'play stays inside the visible window');
+    };
+    assertFramed(play.qb);
+    play.snap();play.receivers[0].x=play.lineOfScrimmage+800;
+    const before=camera.frameWidth;camera.followPlay(play,0);
+    assert.equal(camera.frameWidth,before,'a new target does not jump the window');
+    camera.followPlay(play,dt);
+    assert.ok(camera.frameWidth-before<width*.01,'window starts expanding gently');
+    for(let i=0;i<240;i++)camera.followPlay(play,dt);
+    assert.ok(camera.frameWidth>opening,'deep routes smoothly expand the window');
+    assertFramed(play.qb);assertFramed(play.receivers[0]);
+    camera.setRenderAlpha(.5);
+    assert.ok(Number.isFinite(camera.view.frameWidth),'window interpolates between simulation ticks');
   }
 });
